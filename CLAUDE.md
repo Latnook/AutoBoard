@@ -32,6 +32,17 @@ Then fill in your organization's credentials. See the README for detailed setup 
 
 **Important:** Never commit `.env.local` - it contains sensitive OAuth credentials. The `.env.example` file is provided for reference only.
 
+### Environment Validation
+
+The application includes automatic validation (`src/lib/env-validator.js`) that:
+- Checks for missing or placeholder environment variables
+- Displays user-friendly error messages when configuration is incomplete
+- Shows a setup guide page (`src/app/components/SetupRequired.js`) instead of cryptic errors
+- Logs validation results to console on startup
+- Dynamically enables/disables OAuth providers based on available credentials
+
+If you see the "Setup Required" page, it means environment variables need to be configured properly.
+
 ## Architecture
 
 ### Dual OAuth Flow System

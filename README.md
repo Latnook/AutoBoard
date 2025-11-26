@@ -149,6 +149,8 @@ npm start
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+**Note**: If you see a "Setup Required" page, it means your environment variables need to be configured. The page will show you exactly what's missing and how to fix it. Follow the instructions on that page to complete your setup.
+
 ## Customization for Your Organization
 
 ### Set Default Usage Location
@@ -229,6 +231,15 @@ When Microsoft 365 is connected, the sidebar displays:
 - Real-time updates after user creation
 
 ## Troubleshooting
+
+### Setup Required Page Appears
+
+If you see the "Setup Required" page when starting the application:
+- **Missing credentials**: Your `.env.local` file doesn't exist or contains placeholder values
+- **Invalid secret**: Your `NEXTAUTH_SECRET` is invalid or too short
+- **Incomplete configuration**: Some OAuth credentials are missing
+
+**Solution**: Follow the instructions shown on the setup page. The page will tell you exactly what's wrong and how to fix it.
 
 ### "Insufficient Permissions" Error
 

@@ -33,7 +33,7 @@ Before setting up AutoBoard, you need:
 ### 1. Clone and Install
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Latnook/AutoBoard
 cd autoboard
 npm install
 ```

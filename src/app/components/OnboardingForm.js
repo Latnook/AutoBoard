@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, memo } from "react";
 import { useSession } from "next-auth/react";
-import { COUNTRIES } from "@/lib/constants";
 
-export default function OnboardingForm({ isUnified, onUserCreated }) {
+function OnboardingForm({ isUnified, onUserCreated }) {
     const { data: session } = useSession();
     const [formData, setFormData] = useState({
         firstName: "",
@@ -13,11 +12,21 @@ export default function OnboardingForm({ isUnified, onUserCreated }) {
         jobTitle: "",
         department: "",
         assignLicense: true,
-        usageLocation: "" // No default - user must select
+        usageLocation: "IL", // Default to Israel
     });
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [countries, setCountries] = useState(null);
+
+    // Lazy load countries only when needed (for Microsoft forms)
+    useEffect(() => {
+        if ((isUnified || session?.provider === 'azure-ad') && !countries) {
+            import('@/lib/constants').then((mod) => {
+                setCountries(mod.COUNTRIES);
+            });
+        }
+    }, [isUnified, session?.provider, countries]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -126,9 +135,11 @@ export default function OnboardingForm({ isUnified, onUserCreated }) {
                     </div>
                 )}
 
-                <button onClick={() => setResult(null)} className="btn btn-primary">
-                    Onboard Another User
-                </button>
+                <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                    <button onClick={() => setResult(null)} className="btn btn-primary">
+                        Onboard Another User
+                    </button>
+                </div>
             </div>
         );
     }
@@ -169,7 +180,7 @@ export default function OnboardingForm({ isUnified, onUserCreated }) {
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    placeholder="user@yourdomain.com"
+                    placeholder="john.doe@company.com"
                 />
                 <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Automatically converts to lowercase</small>
             </div>
@@ -204,6 +215,7 @@ export default function OnboardingForm({ isUnified, onUserCreated }) {
                         value={formData.usageLocation}
                         onChange={handleChange}
                         required
+                        disabled={!countries}
                         style={{
                             width: '100%',
                             padding: '0.75rem',
@@ -214,12 +226,15 @@ export default function OnboardingForm({ isUnified, onUserCreated }) {
                             fontSize: '1rem'
                         }}
                     >
-                        <option value="" disabled>Select a country...</option>
-                        {COUNTRIES.map(country => (
-                            <option key={country.code} value={country.code}>
-                                {country.name}
-                            </option>
-                        ))}
+                        {!countries ? (
+                            <option>Loading countries...</option>
+                        ) : (
+                            countries.map(country => (
+                                <option key={country.code} value={country.code}>
+                                    {country.name}
+                                </option>
+                            ))
+                        )}
                     </select>
                 </div>
             )}
@@ -237,9 +252,13 @@ export default function OnboardingForm({ isUnified, onUserCreated }) {
                 </label>
             </div>
 
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? "Creating User..." : "Create User"}
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                    {loading ? "Creating User..." : "Create User"}
+                </button>
+            </div>
         </form>
     );
 }
+
+export default memo(OnboardingForm);

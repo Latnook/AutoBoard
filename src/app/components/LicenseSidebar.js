@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { getReadableLicenseName } from "@/lib/constants";
+import styles from "./dashboard.module.css";
 
-export default function LicenseSidebar({ isConnected, refreshTrigger }) {
+function LicenseSidebar({ isConnected, refreshTrigger }) {
     const [licenses, setLicenses] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -37,9 +38,9 @@ export default function LicenseSidebar({ isConnected, refreshTrigger }) {
     if (!isConnected) return null;
 
     return (
-        <aside className="license-sidebar">
+        <aside className={styles.licenseSidebar}>
             <h3>License Status</h3>
-            {loading && <p className="loading-text">Loading licenses...</p>}
+            {loading && <p className={styles.loadingText}>Loading licenses...</p>}
 
             {error && (
                 <div className="error-msg" style={{
@@ -74,21 +75,25 @@ export default function LicenseSidebar({ isConnected, refreshTrigger }) {
             )}
 
             {!loading && licenses && (
-                <div className="license-list">
+                <div>
                     {licenses.map((lic, i) => (
-                        <div key={i} className={`license-item ${lic.remaining < 5 ? 'low-stock' : ''}`}>
-                            <div className="license-name">{getReadableLicenseName(lic.skuPartNumber)}</div>
-                            <div className="license-count">
-                                <span className="count">{lic.remaining}</span>
-                                <span className="label">available</span>
+                        <div key={i} className={`${styles.licenseItem} ${lic.remaining < 5 ? styles.lowStock : ''}`}>
+                            <div className={styles.licenseName}>{getReadableLicenseName(lic.skuPartNumber)}</div>
+                            <div className={styles.licenseCount}>
+                                <span className={styles.count}>{lic.remaining}</span>
+                                <span className={styles.label}>available</span>
                             </div>
-                            <div className="progress-bar">
-                                <div
-                                    className="progress-fill"
-                                    style={{ width: `${(lic.consumed / lic.total) * 100}%` }}
-                                ></div>
+                            <div className={styles.progressBar}>
+                                {lic.remaining > 0 && (
+                                    <div
+                                        className={styles.progressFill}
+                                        style={{
+                                            width: lic.total > 0 ? `${(lic.remaining / lic.total) * 100}%` : '0%'
+                                        }}
+                                    ></div>
+                                )}
                             </div>
-                            <div className="license-meta">
+                            <div className={styles.licenseMeta}>
                                 {lic.consumed} used / {lic.total} total
                             </div>
                         </div>
@@ -99,3 +104,5 @@ export default function LicenseSidebar({ isConnected, refreshTrigger }) {
         </aside>
     );
 }
+
+export default memo(LicenseSidebar);

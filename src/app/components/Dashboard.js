@@ -83,7 +83,7 @@ export default function Dashboard({ session, secondaryGoogle, secondaryMicrosoft
                         Sign Out
                     </button>
 
-                    <h1 className="title" style={{ fontSize: '2rem', marginBottom: '1rem' }}>Welcome, {session.user.email}</h1>
+                    <h1 className="title" style={{ fontSize: '2rem', marginBottom: '1rem' }}>Welcome, {session.user.name}</h1>
 
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '2rem' }}>
                         <div className={`status-badge ${isGoogleConnected ? 'connected' : 'disconnected'}`}>

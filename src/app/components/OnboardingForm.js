@@ -110,6 +110,9 @@ function OnboardingForm({ isUnified, onUserCreated }) {
                     // Unified Result
                     <div>
                         <div style={{ marginBottom: '1rem' }}>
+                            <p style={{ fontSize: '1.1em', marginBottom: '0.75rem' }}>
+                                <strong>Username:</strong> {result.results.google?.primaryEmail || result.results.microsoft?.userPrincipalName}
+                            </p>
                             <p><strong>Google:</strong> {result.results.google ? "✅ Created" : "❌ Failed/Skipped"}</p>
                             <p><strong>Microsoft:</strong> {result.results.microsoft ? "✅ Created" : "❌ Failed/Skipped"}</p>
                             {result.results.microsoft && (
@@ -120,7 +123,7 @@ function OnboardingForm({ isUnified, onUserCreated }) {
                         </div>
 
                         <div className="password-box">
-                            <p>Temporary Password (for created accounts):</p>
+                            <p>Temporary Password:</p>
                             <code>{result.temporaryPassword}</code>
                         </div>
                     </div>

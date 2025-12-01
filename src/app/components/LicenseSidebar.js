@@ -1,46 +1,73 @@
 "use client";
 
-import { useState, useEffect, memo } from "react";
+import { memo } from "react";
+import useSWR from "swr";
 import { getReadableLicenseName } from "@/lib/constants";
 import styles from "./dashboard.module.css";
 
+const fetcher = async (url) => {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch licenses");
+    }
+
+    return data.licenses;
+};
+
 function LicenseSidebar({ isConnected, refreshTrigger }) {
-    const [licenses, setLicenses] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const { data: licenses, error, isLoading: loading, mutate } = useSWR(
+        isConnected ? "/api/licenses" : null,
+        fetcher,
+        {
+            refreshInterval: 60000, // Auto-refresh every 60 seconds
+            revalidateOnFocus: false,
+            dedupingInterval: 5000, // Dedupe requests within 5 seconds
+        }
+    );
 
-    useEffect(() => {
-        const fetchLicenses = async () => {
-            if (!isConnected) return;
-
-            setLoading(true);
-            setError(null);
-            try {
-                const res = await fetch("/api/licenses");
-                const data = await res.json();
-
-                if (res.ok) {
-                    setLicenses(data.licenses);
-                } else {
-                    setError(data.error || "Failed to fetch licenses");
-                }
-            } catch (err) {
-                console.error("Failed to fetch licenses", err);
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchLicenses();
-    }, [isConnected, refreshTrigger]);
+    // Trigger revalidation when refreshTrigger changes (after user creation)
+    if (refreshTrigger > 0 && isConnected) {
+        mutate();
+    }
 
     if (!isConnected) return null;
 
     return (
         <aside className={styles.licenseSidebar}>
             <h3>License Status</h3>
-            {loading && <p className={styles.loadingText}>Loading licenses...</p>}
+            {loading && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {[1, 2, 3].map((i) => (
+                        <div key={i} style={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '0.75rem',
+                            padding: '1rem',
+                            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                        }}>
+                            <div style={{
+                                height: '1rem',
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                borderRadius: '0.25rem',
+                                marginBottom: '0.75rem',
+                                width: '70%'
+                            }}></div>
+                            <div style={{
+                                height: '2rem',
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                borderRadius: '0.25rem',
+                                marginBottom: '0.5rem'
+                            }}></div>
+                            <div style={{
+                                height: '0.5rem',
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                borderRadius: '0.25rem'
+                            }}></div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {error && (
                 <div className="error-msg" style={{
@@ -55,9 +82,9 @@ function LicenseSidebar({ isConnected, refreshTrigger }) {
                     flexDirection: 'column',
                     gap: '0.5rem'
                 }}>
-                    <span>⚠️ {error}</span>
+                    <span>⚠️ {error.message}</span>
                     <button
-                        onClick={() => window.location.reload()}
+                        onClick={() => mutate()}
                         style={{
                             alignSelf: 'flex-start',
                             background: 'none',

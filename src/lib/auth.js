@@ -1,62 +1,46 @@
 import GoogleProvider from "next-auth/providers/google";
 import AzureADProvider from "next-auth/providers/azure-ad";
-import { logger } from "@/lib/logger";
-import { validateEnvVariables, getSetupInstructions } from "@/lib/env-validator";
 
-// Validate environment variables on startup
-const validation = validateEnvVariables();
-if (!validation.isValid || validation.warnings.length > 0) {
-  console.log('\n' + getSetupInstructions(validation.errors, validation.warnings));
-}
-
-// Build providers array dynamically based on available credentials
-function getProviders() {
-  const providers = [];
-
-  // Add Google provider if credentials are available
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    providers.push(
-      GoogleProvider({
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        authorization: {
-          params: {
-            scope: "openid email profile https://www.googleapis.com/auth/admin.directory.user",
-            prompt: "consent",
-            access_type: "offline",
-            response_type: "code",
-          },
-        },
-      })
-    );
+// Lazy-load logger to reduce initial bundle
+let logger;
+function getLogger() {
+  if (!logger) {
+    logger = require("@/lib/logger").logger;
   }
-
-  // Add Microsoft provider if credentials are available
-  if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.MICROSOFT_TENANT_ID) {
-    providers.push(
-      AzureADProvider({
-        clientId: process.env.MICROSOFT_CLIENT_ID,
-        clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
-        tenantId: process.env.MICROSOFT_TENANT_ID,
-        authorization: {
-          params: {
-            scope: "openid profile email User.ReadWrite.All Directory.ReadWrite.All",
-          },
-        },
-      })
-    );
-  }
-
-  return providers;
+  return logger;
 }
 
 export const authOptions = {
-  providers: getProviders(),
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          scope: "openid email profile https://www.googleapis.com/auth/admin.directory.user",
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
+    }),
+    AzureADProvider({
+      clientId: process.env.MICROSOFT_CLIENT_ID,
+      clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+      tenantId: process.env.MICROSOFT_TENANT_ID,
+      authorization: {
+        params: {
+          scope: "openid profile email User.ReadWrite.All Directory.ReadWrite.All",
+        },
+      },
+    }),
+  ],
   callbacks: {
-    async jwt({ token, account }) {
+    async jwt({ token, account, user }) {
       // Initial sign in
       if (account) {
         return {
+          ...token,
           accessToken: account.access_token,
           expiresAt: Math.floor(Date.now() / 1000 + account.expires_in),
           refreshToken: account.refresh_token,
@@ -73,10 +57,12 @@ export const authOptions = {
       return await refreshAccessToken(token);
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken;
-      session.provider = token.provider;
-      session.error = token.error;
-      return session;
+      return {
+        ...session,
+        accessToken: token.accessToken,
+        provider: token.provider,
+        error: token.error,
+      };
     },
   },
 };
@@ -126,7 +112,7 @@ async function refreshAccessToken(token) {
       throw refreshedTokens;
     }
 
-    logger.info(`Token refreshed successfully for provider: ${token.provider}`);
+    getLogger().info(`Token refreshed successfully for provider: ${token.provider}`);
 
     return {
       ...token,
@@ -136,7 +122,7 @@ async function refreshAccessToken(token) {
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     };
   } catch (error) {
-    logger.error("Error refreshing access token:", { error: error.message || error, provider: token.provider });
+    getLogger().error("Error refreshing access token:", { error: error.message || error, provider: token.provider });
     console.error("Error refreshing access token:", error);
 
     return {

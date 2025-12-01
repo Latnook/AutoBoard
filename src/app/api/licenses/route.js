@@ -27,7 +27,12 @@ export async function GET(req) {
 
     try {
         const licenses = await getLicenseStatus(microsoftToken);
-        return NextResponse.json({ licenses });
+        const response = NextResponse.json({ licenses });
+
+        // Cache license data for 60 seconds (revalidate in background)
+        response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=30');
+
+        return response;
     } catch (error) {
         console.error("Failed to fetch licenses:", error);
 

@@ -1,12 +1,25 @@
 "use client";
 
 import { signIn, signOut } from "next-auth/react";
-import { useState, memo } from "react";
-import OnboardingForm from "./OnboardingForm";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import LicenseSidebar from "./LicenseSidebar";
 import { GoogleIcon, MicrosoftIcon } from "./Icons";
 import styles from "./dashboard.module.css";
+
+const OnboardingForm = dynamic(() => import("./OnboardingForm").then(mod => mod.default), {
+    loading: () => <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading form...</div>
+});
+
+const LicenseSidebar = dynamic(() => import("./LicenseSidebar").then(mod => mod.default), {
+    loading: () => (
+        <aside className={styles.licenseSidebar}>
+            <h3>License Status</h3>
+            <p className={styles.loadingText}>Loading licenses...</p>
+        </aside>
+    ),
+    ssr: false
+});
 
 export default function Dashboard({ session, secondaryGoogle, secondaryMicrosoft }) {
     const router = useRouter();

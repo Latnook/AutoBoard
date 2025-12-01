@@ -57,41 +57,50 @@ export async function POST(req) {
             errors: []
         };
 
-        // 1. Create Google User
-        try {
-            const googleData = {
-                firstName,
-                lastName,
-                displayName: `${firstName} ${lastName}`,
-                email,
-                password,
-                jobTitle,
-                department
-            };
-            results.google = await createGoogleUser(googleToken, googleData);
-        } catch (err) {
-            console.error("Google creation failed:", err);
-            results.errors.push(err.message);
+        // 1. Create Google and Microsoft Users in PARALLEL for faster onboarding
+        const googleData = {
+            firstName,
+            lastName,
+            displayName: `${firstName} ${lastName}`,
+            email,
+            password,
+            jobTitle,
+            department
+        };
+
+        const mailNickname = email.split('@')[0];
+        const microsoftData = {
+            firstName,
+            lastName,
+            displayName: `${firstName} ${lastName}`,
+            userPrincipalName: email,
+            mailNickname,
+            password,
+            jobTitle,
+            department,
+            usageLocation
+        };
+
+        // Execute both API calls in parallel
+        const [googleResult, microsoftResult] = await Promise.allSettled([
+            createGoogleUser(googleToken, googleData),
+            createMicrosoftUser(microsoftToken, microsoftData)
+        ]);
+
+        // Handle Google result
+        if (googleResult.status === 'fulfilled') {
+            results.google = googleResult.value;
+        } else {
+            console.error("Google creation failed:", googleResult.reason);
+            results.errors.push(googleResult.reason.message);
         }
 
-        // 2. Create Microsoft User
-        try {
-            const mailNickname = email.split('@')[0];
-            const microsoftData = {
-                firstName,
-                lastName,
-                displayName: `${firstName} ${lastName}`,
-                userPrincipalName: email,
-                mailNickname,
-                password,
-                jobTitle,
-                department,
-                usageLocation // Pass usageLocation
-            };
-            results.microsoft = await createMicrosoftUser(microsoftToken, microsoftData);
+        // Handle Microsoft result
+        if (microsoftResult.status === 'fulfilled') {
+            results.microsoft = microsoftResult.value;
 
-            // 3. Assign License (if requested and user created successfully)
-            if (results.microsoft && shouldAssignLicense) {
+            // 2. Assign License (if requested and user created successfully)
+            if (shouldAssignLicense) {
                 try {
                     await assignLicense(microsoftToken, results.microsoft.id, MICROSOFT_BUSINESS_STANDARD_SKU);
                     results.microsoft.licenseAssigned = true;
@@ -102,9 +111,9 @@ export async function POST(req) {
                     results.microsoft.licenseError = licenseErr.message;
                 }
             }
-        } catch (err) {
-            console.error("Microsoft creation failed:", err);
-            results.errors.push(err.message);
+        } else {
+            console.error("Microsoft creation failed:", microsoftResult.reason);
+            results.errors.push(microsoftResult.reason.message);
         }
 
         // Determine overall success status

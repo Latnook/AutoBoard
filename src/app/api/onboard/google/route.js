@@ -12,7 +12,7 @@ export async function POST(req) {
 
     try {
         const body = await req.json();
-        let { firstName, lastName, email, jobTitle, department, assignLicense } = body;
+        let { firstName, lastName, email, jobTitle, department, assignLicense, useCustomOU, orgUnitPath } = body;
 
         // Force lowercase email
         email = email.toLowerCase();
@@ -27,7 +27,8 @@ export async function POST(req) {
             email,
             password,
             jobTitle,
-            department
+            department,
+            orgUnitPath: useCustomOU ? orgUnitPath : '/' // Use custom OU if specified, otherwise root
         };
 
         const newUser = await createGoogleUser(token.accessToken, userData);

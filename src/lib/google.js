@@ -17,7 +17,7 @@ export async function createGoogleUser(accessToken, userData) {
                 },
                 password: userData.password,
                 changePasswordAtNextLogin: true,
-                orgUnitPath: '/', // Default OU
+                orgUnitPath: userData.orgUnitPath || '/', // Use provided OU path or default to root
                 organizations: [
                     {
                         title: userData.jobTitle,

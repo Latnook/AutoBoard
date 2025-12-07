@@ -161,3 +161,52 @@ export async function assignLicense(accessToken, userId, skuPartNumber) {
         throw new Error(`Failed to assign license: ${error.message}`);
     }
 }
+
+export async function addUserToAdministrativeUnit(accessToken, administrativeUnitId, userId) {
+    const client = Client.init({
+        authProvider: (done) => {
+            done(null, accessToken);
+        },
+    });
+
+    try {
+        // Add user to administrative unit as a member
+        await client.api(`/administrativeUnits/${administrativeUnitId}/members/$ref`).post({
+            "@odata.id": `https://graph.microsoft.com/v1.0/users/${userId}`
+        });
+
+        logger.info(`User ${userId} added to Administrative Unit ${administrativeUnitId}`);
+        return true;
+    } catch (error) {
+        logger.error(`Failed to add user ${userId} to Administrative Unit ${administrativeUnitId}`, { error: error.message });
+        console.error(`Failed to add user to Administrative Unit:`, error);
+
+        if (error.body) {
+            try {
+                const body = JSON.parse(error.body);
+                if (body.error) {
+                    const errCode = body.error.code;
+                    const errMessage = body.error.message;
+
+                    if (errCode === "Request_ResourceNotFound") {
+                        throw new Error(`Administrative Unit not found. Please verify the Administrative Unit ID is correct.`);
+                    }
+
+                    if (errCode === "Authorization_RequestDenied") {
+                        throw new Error(`Insufficient permissions to add user to Administrative Unit. Please ensure the app has 'AdministrativeUnit.ReadWrite.All' permission.`);
+                    }
+
+                    if (errMessage.includes("already exists") || errMessage.includes("One or more added object references already exist")) {
+                        throw new Error(`User is already a member of this Administrative Unit.`);
+                    }
+
+                    throw new Error(`Administrative Unit Error (${errCode}): ${errMessage}`);
+                }
+            } catch (parseError) {
+                // Fall through
+            }
+        }
+
+        throw new Error(`Failed to add user to Administrative Unit: ${error.message}`);
+    }
+}

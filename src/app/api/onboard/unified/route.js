@@ -1,6 +1,6 @@
 import { getToken } from "next-auth/jwt";
 import { createGoogleUser } from "@/lib/google";
-import { createMicrosoftUser, assignLicense, MICROSOFT_BUSINESS_STANDARD_SKU } from "@/lib/microsoft";
+import { createMicrosoftUser, assignLicense, addUserToAdministrativeUnit, MICROSOFT_BUSINESS_STANDARD_SKU } from "@/lib/microsoft";
 import { generatePassword } from "@/lib/utils";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -41,7 +41,7 @@ export async function POST(req) {
 
     try {
         const body = await req.json();
-        let { firstName, lastName, email, jobTitle, department, assignLicense: shouldAssignLicense, usageLocation } = body;
+        let { firstName, lastName, email, jobTitle, department, assignLicense: shouldAssignLicense, usageLocation, useCustomOU, orgUnitPath, useAdminUnit, administrativeUnitId } = body;
 
         // Force lowercase email
         email = email.toLowerCase();
@@ -65,7 +65,8 @@ export async function POST(req) {
             email,
             password,
             jobTitle,
-            department
+            department,
+            orgUnitPath: useCustomOU ? orgUnitPath : '/' // Use custom OU if specified, otherwise root
         };
 
         const mailNickname = email.split('@')[0];
@@ -109,6 +110,19 @@ export async function POST(req) {
                     results.errors.push(`User created but license assignment failed: ${licenseErr.message}`);
                     results.microsoft.licenseAssigned = false;
                     results.microsoft.licenseError = licenseErr.message;
+                }
+            }
+
+            // 3. Add to Administrative Unit (if requested and user created successfully)
+            if (useAdminUnit && administrativeUnitId) {
+                try {
+                    await addUserToAdministrativeUnit(microsoftToken, administrativeUnitId, results.microsoft.id);
+                    results.microsoft.adminUnitAssigned = true;
+                } catch (adminUnitErr) {
+                    console.error("Administrative Unit assignment failed:", adminUnitErr);
+                    results.errors.push(`User created but Administrative Unit assignment failed: ${adminUnitErr.message}`);
+                    results.microsoft.adminUnitAssigned = false;
+                    results.microsoft.adminUnitError = adminUnitErr.message;
                 }
             }
         } else {

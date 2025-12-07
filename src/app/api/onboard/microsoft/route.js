@@ -1,5 +1,5 @@
 import { getToken } from "next-auth/jwt";
-import { createMicrosoftUser, assignLicense, MICROSOFT_BUSINESS_STANDARD_SKU } from "@/lib/microsoft";
+import { createMicrosoftUser, assignLicense, addUserToAdministrativeUnit, MICROSOFT_BUSINESS_STANDARD_SKU } from "@/lib/microsoft";
 import { generatePassword } from "@/lib/utils";
 import { NextResponse } from "next/server";
 
@@ -12,7 +12,7 @@ export async function POST(req) {
 
     try {
         const body = await req.json();
-        let { firstName, lastName, email, jobTitle, department, assignLicense: shouldAssignLicense, usageLocation } = body;
+        let { firstName, lastName, email, jobTitle, department, assignLicense: shouldAssignLicense, usageLocation, useAdminUnit, administrativeUnitId } = body;
 
         // Force lowercase email
         email = email.toLowerCase();
@@ -37,25 +37,31 @@ export async function POST(req) {
 
         const newUser = await createMicrosoftUser(token.accessToken, userData);
 
+        const warnings = [];
+
         if (shouldAssignLicense) {
             try {
                 await assignLicense(token.accessToken, newUser.id, MICROSOFT_BUSINESS_STANDARD_SKU);
             } catch (licenseError) {
                 console.error("License assignment failed:", licenseError);
-                // We continue even if license assignment fails, but include a warning in the response
-                return NextResponse.json({
-                    success: true,
-                    user: newUser,
-                    temporaryPassword: password,
-                    warning: "User created but license assignment failed."
-                });
+                warnings.push("License assignment failed: " + licenseError.message);
+            }
+        }
+
+        if (useAdminUnit && administrativeUnitId) {
+            try {
+                await addUserToAdministrativeUnit(token.accessToken, administrativeUnitId, newUser.id);
+            } catch (adminUnitError) {
+                console.error("Administrative Unit assignment failed:", adminUnitError);
+                warnings.push("Administrative Unit assignment failed: " + adminUnitError.message);
             }
         }
 
         return NextResponse.json({
             success: true,
             user: newUser,
-            temporaryPassword: password
+            temporaryPassword: password,
+            ...(warnings.length > 0 && { warning: warnings.join(" ") })
         });
 
     } catch (error) {

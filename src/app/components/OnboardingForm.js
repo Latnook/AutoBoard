@@ -13,6 +13,10 @@ function OnboardingForm({ isUnified, onUserCreated }) {
         department: "",
         assignLicense: true,
         usageLocation: "IL", // Default to Israel
+        useCustomOU: false, // Toggle for custom OU path (Google)
+        orgUnitPath: "/", // Default to root OU (Google)
+        useAdminUnit: false, // Toggle for Administrative Unit (Microsoft)
+        administrativeUnitId: "", // Administrative Unit ID (Microsoft)
     });
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -210,36 +214,100 @@ function OnboardingForm({ isUnified, onUserCreated }) {
                 />
             </div>
 
+            {(isUnified || session?.provider === 'google') && (
+                <>
+                    <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', display: 'flex', gap: '0.5rem' }}>
+                        <input
+                            type="checkbox"
+                            name="useCustomOU"
+                            checked={formData.useCustomOU}
+                            onChange={(e) => setFormData(prev => ({ ...prev, useCustomOU: e.target.checked }))}
+                            style={{ width: 'auto', margin: 0 }}
+                        />
+                        <label style={{ margin: 0, cursor: 'pointer' }} onClick={() => setFormData(prev => ({ ...prev, useCustomOU: !prev.useCustomOU }))}>
+                            Specify Google Workspace Organizational Unit
+                        </label>
+                    </div>
+
+                    {formData.useCustomOU && (
+                        <div className="form-group">
+                            <label>Organizational Unit Path</label>
+                            <input
+                                type="text"
+                                name="orgUnitPath"
+                                value={formData.orgUnitPath}
+                                onChange={handleChange}
+                                placeholder="/Sales/Eastern Region"
+                            />
+                            <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                                Enter the full OU path (e.g., /Sales or /Engineering/Backend). Default is / (root).
+                            </small>
+                        </div>
+                    )}
+                </>
+            )}
+
             {(isUnified || session?.provider === 'azure-ad') && (
-                <div className="form-group">
-                    <label>Location (Microsoft Requirement)</label>
-                    <select
-                        name="usageLocation"
-                        value={formData.usageLocation}
-                        onChange={handleChange}
-                        required
-                        disabled={!countries}
-                        style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            borderRadius: '0.5rem',
-                            backgroundColor: '#334155',
-                            border: '1px solid #475569',
-                            color: 'white',
-                            fontSize: '1rem'
-                        }}
-                    >
-                        {!countries ? (
-                            <option>Loading countries...</option>
-                        ) : (
-                            countries.map(country => (
-                                <option key={country.code} value={country.code}>
-                                    {country.name}
-                                </option>
-                            ))
-                        )}
-                    </select>
-                </div>
+                <>
+                    <div className="form-group">
+                        <label>Location (Microsoft Requirement)</label>
+                        <select
+                            name="usageLocation"
+                            value={formData.usageLocation}
+                            onChange={handleChange}
+                            required
+                            disabled={!countries}
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                borderRadius: '0.5rem',
+                                backgroundColor: '#334155',
+                                border: '1px solid #475569',
+                                color: 'white',
+                                fontSize: '1rem'
+                            }}
+                        >
+                            {!countries ? (
+                                <option>Loading countries...</option>
+                            ) : (
+                                countries.map(country => (
+                                    <option key={country.code} value={country.code}>
+                                        {country.name}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+
+                    <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', display: 'flex', gap: '0.5rem' }}>
+                        <input
+                            type="checkbox"
+                            name="useAdminUnit"
+                            checked={formData.useAdminUnit}
+                            onChange={(e) => setFormData(prev => ({ ...prev, useAdminUnit: e.target.checked }))}
+                            style={{ width: 'auto', margin: 0 }}
+                        />
+                        <label style={{ margin: 0, cursor: 'pointer' }} onClick={() => setFormData(prev => ({ ...prev, useAdminUnit: !prev.useAdminUnit }))}>
+                            Assign to Administrative Unit (Entra ID)
+                        </label>
+                    </div>
+
+                    {formData.useAdminUnit && (
+                        <div className="form-group">
+                            <label>Administrative Unit ID</label>
+                            <input
+                                type="text"
+                                name="administrativeUnitId"
+                                value={formData.administrativeUnitId}
+                                onChange={handleChange}
+                                placeholder="e.g., 12345678-1234-1234-1234-123456789012"
+                            />
+                            <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                                Enter the Administrative Unit ID (GUID). Find it in Entra ID &gt; Identity &gt; Administrative units.
+                            </small>
+                        </div>
+                    )}
+                </>
             )}
 
             <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', display: 'flex', gap: '0.5rem' }}>

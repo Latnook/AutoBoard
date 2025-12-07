@@ -12,7 +12,7 @@ function OnboardingForm({ isUnified, onUserCreated }) {
         jobTitle: "",
         department: "",
         assignLicense: true,
-        usageLocation: "IL", // Default to Israel
+        usageLocation: "", // No default - user must select
         useCustomOU: false, // Toggle for custom OU path (Google)
         orgUnitPath: "/", // Default to root OU (Google)
         useAdminUnit: false, // Toggle for Administrative Unit (Microsoft)

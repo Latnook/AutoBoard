@@ -7,12 +7,47 @@ A Next.js application that automates employee onboarding by creating user accoun
 - **Dual Platform Support**: Create users in Google Workspace and Microsoft 365 from one form
 - **OAuth Integration**: Secure authentication with both Google and Microsoft
 - **License Management**: Automatically assign Microsoft 365 licenses during user creation
+- **Organizational Unit Selection**: Optional OU placement for Google Workspace users (NEW)
+- **Administrative Unit Assignment**: Optional AU assignment for Microsoft Entra ID users (NEW)
 - **Real-time License Tracking**: View available Microsoft 365 licenses in the sidebar
 - **Unified or Single Platform**: Works with just one platform or both together
 - **Automatic Password Generation**: Creates secure temporary passwords for new users
 - **Error Handling**: Detailed error messages and partial success handling
 - **Session Management**: Automatic token refresh for uninterrupted operation
 - **High Performance**: Parallel API calls, smart caching, and optimized builds for speed
+
+## New Features
+
+### Google Workspace - Organizational Unit (OU) Selection
+
+Optionally specify which Organizational Unit to place new users in:
+
+- **Toggle to enable/disable**: Hidden by default to avoid clutter
+- **Custom OU path input**: Enter paths like `/Sales`, `/Engineering/Backend`, etc.
+- **Defaults to root**: When disabled, users are placed in `/` (root OU)
+- **Available in all modes**: Works with unified and Google-only onboarding
+
+**How to use:**
+1. Enable "Specify Google Workspace Organizational Unit" checkbox in the onboarding form
+2. Enter the full OU path (e.g., `/Marketing/EMEA`)
+3. Ensure the OU exists in Google Workspace Admin Console
+
+### Microsoft Entra ID - Administrative Unit Assignment
+
+Optionally assign new users to Administrative Units:
+
+- **Toggle to enable/disable**: Hidden by default
+- **GUID-based selection**: Enter the Administrative Unit ID from Entra ID
+- **Post-creation assignment**: User is added to AU after successful creation
+- **Graceful error handling**: Continues even if AU assignment fails
+
+**How to use:**
+1. Create Administrative Units in Entra ID (Identity > Administrative units)
+2. Copy the Administrative Unit ID (GUID format)
+3. Enable "Assign to Administrative Unit (Entra ID)" checkbox in the onboarding form
+4. Paste the AU ID
+
+**Required permission:** Add `AdministrativeUnit.ReadWrite.All` to your Microsoft app permissions (see Microsoft 365 Setup section)
 
 ## Prerequisites
 
@@ -98,6 +133,7 @@ The authenticated Google admin must have permission to create users in Google Wo
    - Add these permissions:
      - `User.ReadWrite.All`
      - `Directory.ReadWrite.All`
+     - `AdministrativeUnit.ReadWrite.All` (optional, for Administrative Unit assignment)
      - `offline_access`
    - Click "Grant admin consent" (requires Global Admin)
 

@@ -30,7 +30,7 @@ export async function GET(request, { params }) {
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             path: '/',
-            maxAge: 3600 // 1 hour
+            // No maxAge = session cookie (expires when browser closes)
         });
 
         // Redirect back to home

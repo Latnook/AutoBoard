@@ -30,11 +30,28 @@ export const authOptions = {
       tenantId: process.env.MICROSOFT_TENANT_ID,
       authorization: {
         params: {
-          scope: "openid profile email User.ReadWrite.All Directory.ReadWrite.All",
+          scope: "openid profile email User.ReadWrite.All Directory.ReadWrite.All offline_access",
+          prompt: "consent",
         },
       },
     }),
   ],
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60, // 1 hour max session (in seconds)
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        // No maxAge = session cookie (expires when browser closes)
+      },
+    },
+  },
   callbacks: {
     async jwt({ token, account, user }) {
       // Initial sign in
@@ -71,7 +88,12 @@ async function refreshAccessToken(token) {
   try {
     if (!token.refreshToken) {
       console.error("No refresh token available for provider:", token.provider);
-      throw new Error("No refresh token available");
+      // If no refresh token, mark token as expired but don't crash
+      // User will need to sign in again
+      return {
+        ...token,
+        error: "RefreshAccessTokenError",
+      };
     }
 
     const url =

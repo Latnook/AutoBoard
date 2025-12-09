@@ -1,7 +1,7 @@
 "use client";
 
 import { signIn, signOut } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { GoogleIcon, MicrosoftIcon } from "./Icons";
@@ -23,6 +23,14 @@ const LicenseSidebar = dynamic(() => import("./LicenseSidebar").then(mod => mod.
 
 export default function Dashboard({ session, secondaryGoogle, secondaryMicrosoft }) {
     const router = useRouter();
+
+    // Force sign out if session has error (e.g., no refresh token)
+    useEffect(() => {
+        if (session?.error === "RefreshAccessTokenError") {
+            console.log("Session error detected, forcing sign out...");
+            signOut({ callbackUrl: "/" });
+        }
+    }, [session]);
 
     const handleSignOut = async () => {
         // Clear local cookies first

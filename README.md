@@ -63,8 +63,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 
 ## Branches
 
-- **`main`**: Original codebase
-- **`master`**: Production version with latest security features
+- **`main`**: Production-ready version with all features and security improvements
 - **`n8n-integration`**: Includes n8n workflow automation integration (see `n8n-migration/` folder)
 
 ## Security

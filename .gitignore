@@ -31,6 +31,10 @@
 # Claude Code
 .claude
 
+# Deployment-only files (not for generic version)
+sync-to-generic.sh
+DEVELOPMENT.md
+
 # debug
 npm-debug.log*
 yarn-debug.log*

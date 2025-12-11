@@ -1,19 +1,19 @@
 :root {
-  --background: #0a0e1a;
+  --background: #0a1a14;
   --foreground: #f8fafc;
-  --primary: #6366f1;
-  --primary-dark: #4f46e5;
-  --primary-light: #818cf8;
-  --secondary: #8b5cf6;
+  --primary: #4ade80;
+  --primary-dark: #22c55e;
+  --primary-light: #86efac;
+  --secondary: #14b8a6;
   --accent: #06b6d4;
   --success: #10b981;
   --error: #ef4444;
   --warning: #f59e0b;
 
-  --card-bg: rgba(30, 41, 59, 0.7);
-  --card-border: rgba(255, 255, 255, 0.12);
-  --input-bg: rgba(30, 41, 59, 0.8);
-  --input-border: rgba(71, 85, 105, 0.8);
+  --card-bg: rgba(20, 50, 40, 0.7);
+  --card-border: rgba(74, 222, 128, 0.12);
+  --input-bg: rgba(20, 50, 40, 0.8);
+  --input-border: rgba(20, 184, 166, 0.5);
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
   --shadow-md: 0 3px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.12);
@@ -28,7 +28,7 @@
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', 'Helvetica Neue', sans-serif;
-  background: linear-gradient(135deg, #0a0e1a 0%, #141a2e 40%, #1a1f3a 100%);
+  background: linear-gradient(135deg, #0a1a14 0%, #0f2620 40%, #14332a 100%);
   background-attachment: fixed;
   color: var(--foreground);
   line-height: 1.65;
@@ -46,8 +46,8 @@ body::before {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 20% 30%, rgba(74, 222, 128, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(20, 184, 166, 0.06) 0%, transparent 50%),
     radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.04) 0%, transparent 60%);
   pointer-events: none;
   z-index: -1;
@@ -84,14 +84,14 @@ body::before {
 .title {
   font-size: clamp(2.5rem, 8vw, 4rem);
   font-weight: 800;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  background: linear-gradient(135deg, #4ade80 0%, #14b8a6 50%, #06b6d4 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   margin-bottom: 1rem;
   letter-spacing: -0.025em;
   background-size: 200% 200%;
-  filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.1));
+  filter: drop-shadow(0 2px 8px rgba(74, 222, 128, 0.1));
   will-change: auto;
 }
 
@@ -109,7 +109,7 @@ body::before {
 
 .subtitle {
   font-size: 1.25rem;
-  color: #94a3b8;
+  color: #94b8a8;
   margin-bottom: 3rem;
   text-align: center;
   font-weight: 400;
@@ -255,11 +255,11 @@ body::before {
 }
 
 .form-card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
+  border-color: rgba(74, 222, 128, 0.3);
   transform: translateY(-3px);
   box-shadow:
     var(--shadow-xl),
-    0 0 0 1px rgba(99, 102, 241, 0.2) inset;
+    0 0 0 1px rgba(74, 222, 128, 0.2) inset;
 }
 
 .form-group {
@@ -272,7 +272,7 @@ body::before {
   margin-bottom: 0.5rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #cbd5e1;
+  color: #d1e5dd;
   letter-spacing: 0.025em;
 }
 
@@ -294,21 +294,21 @@ body::before {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary);
-  background-color: rgba(26, 35, 50, 0.9);
+  background-color: rgba(15, 38, 32, 0.9);
   box-shadow:
-    0 0 0 3px rgba(99, 102, 241, 0.12),
+    0 0 0 3px rgba(74, 222, 128, 0.12),
     inset 0 2px 4px rgba(0, 0, 0, 0.1);
   transform: translateY(-1px);
 }
 
 .form-group input:hover,
 .form-group select:hover {
-  border-color: rgba(99, 102, 241, 0.4);
-  background-color: rgba(26, 35, 50, 0.85);
+  border-color: rgba(74, 222, 128, 0.4);
+  background-color: rgba(15, 38, 32, 0.85);
 }
 
 .form-group input::placeholder {
-  color: #64748b;
+  color: #5a8a78;
   opacity: 0.8;
 }
 
@@ -322,7 +322,7 @@ body::before {
 }
 
 .password-box {
-  background: linear-gradient(135deg, rgba(26, 35, 50, 0.85) 0%, rgba(15, 23, 42, 0.85) 100%);
+  background: linear-gradient(135deg, rgba(15, 38, 32, 0.85) 0%, rgba(10, 26, 20, 0.85) 100%);
   padding: 2rem;
   border-radius: 14px;
   margin: 1.5rem 0;
@@ -382,7 +382,7 @@ body::before {
 
 .connected {
   background: rgba(16, 185, 129, 0.18);
-  color: #4ade80;
+  color: #6ee7b7;
   border-color: rgba(16, 185, 129, 0.5);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -390,9 +390,9 @@ body::before {
 }
 
 .disconnected {
-  background: rgba(71, 85, 105, 0.35);
-  color: #94a3b8;
-  border-color: rgba(71, 85, 105, 0.5);
+  background: rgba(20, 184, 166, 0.15);
+  color: #99c9be;
+  border-color: rgba(20, 184, 166, 0.3);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 2px 4px rgba(0, 0, 0, 0.1);
@@ -487,12 +487,12 @@ html {
 
 /* Selection */
 ::selection {
-  background: rgba(99, 102, 241, 0.4);
+  background: rgba(74, 222, 128, 0.4);
   color: white;
 }
 
 ::-moz-selection {
-  background: rgba(99, 102, 241, 0.4);
+  background: rgba(74, 222, 128, 0.4);
   color: white;
 }
 

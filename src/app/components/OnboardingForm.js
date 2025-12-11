@@ -12,7 +12,7 @@ function OnboardingForm({ isUnified, onUserCreated }) {
         jobTitle: "",
         department: "",
         assignLicense: true,
-        usageLocation: "IL", // Default to Israel
+        usageLocation: "", // No default - user must select
         useCustomOU: false, // Toggle for custom OU path (Google)
         orgUnitPath: "/", // Default to root OU (Google)
         useAdminUnit: false, // Toggle for Administrative Unit (Microsoft)
@@ -22,7 +22,6 @@ function OnboardingForm({ isUnified, onUserCreated }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [countries, setCountries] = useState(null);
-    const [backendUsed, setBackendUsed] = useState(null); // Track which backend was used
 
     // Lazy load countries only when needed (for Microsoft forms)
     useEffect(() => {
@@ -49,7 +48,6 @@ function OnboardingForm({ isUnified, onUserCreated }) {
         setLoading(true);
         setError("");
         setResult(null);
-        setBackendUsed(null);
 
         let endpoint;
         if (isUnified) {
@@ -60,126 +58,14 @@ function OnboardingForm({ isUnified, onUserCreated }) {
                 : "/api/onboard/microsoft";
         }
 
-        // Try n8n first (if configured), then fallback to built-in API
-        const n8nWebhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
-
         try {
-            let res;
-            let data;
-            let usedN8n = false;
-            let n8nErrorDetails = null;
+            const res = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
 
-            // Try n8n webhook first if URL is configured
-            if (n8nWebhookUrl && isUnified) {
-                try {
-                    console.log("🚀 Attempting n8n webhook:", n8nWebhookUrl);
-
-                    const n8nHeaders = { "Content-Type": "application/json" };
-
-                    // Add API key if configured
-                    const n8nApiKey = process.env.NEXT_PUBLIC_N8N_API_KEY;
-                    if (n8nApiKey) {
-                        n8nHeaders["X-API-Key"] = n8nApiKey;
-                    }
-
-                    const startTime = Date.now();
-                    res = await fetch(n8nWebhookUrl, {
-                        method: "POST",
-                        headers: n8nHeaders,
-                        body: JSON.stringify(formData),
-                    });
-
-                    const responseTime = Date.now() - startTime;
-
-                    if (!res.ok) {
-                        throw new Error(`n8n returned status ${res.status}: ${res.statusText}`);
-                    }
-
-                    data = await res.json();
-                    usedN8n = true;
-                    setBackendUsed('n8n');
-                    console.log(`✅ n8n webhook succeeded (${responseTime}ms)`);
-
-                    // Log to backend
-                    await fetch('/api/log', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            level: 'info',
-                            message: 'User creation via n8n workflow',
-                            metadata: {
-                                email: formData.email,
-                                backend: 'n8n',
-                                responseTime: responseTime,
-                                success: data.success
-                            }
-                        })
-                    }).catch(() => {}); // Ignore logging errors
-
-                } catch (n8nError) {
-                    n8nErrorDetails = {
-                        message: n8nError.message,
-                        timestamp: new Date().toISOString(),
-                        url: n8nWebhookUrl
-                    };
-
-                    console.error("❌ n8n webhook failed:", n8nError);
-                    console.warn("⚠️ Falling back to built-in API");
-
-                    // Log the error to backend
-                    await fetch('/api/log', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            level: 'error',
-                            message: 'n8n webhook failed, falling back to built-in API',
-                            metadata: {
-                                email: formData.email,
-                                error: n8nError.message,
-                                url: n8nWebhookUrl
-                            }
-                        })
-                    }).catch(() => {}); // Ignore logging errors
-
-                    // Fall through to built-in API
-                    usedN8n = false;
-                }
-            }
-
-            // Use built-in API if n8n wasn't used or failed
-            if (!usedN8n) {
-                console.log("🔧 Using built-in API:", endpoint);
-                const startTime = Date.now();
-
-                res = await fetch(endpoint, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(formData),
-                });
-
-                const responseTime = Date.now() - startTime;
-                data = await res.json();
-                setBackendUsed('built-in');
-
-                // Log to backend
-                await fetch('/api/log', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        level: 'info',
-                        message: 'User creation via built-in API',
-                        metadata: {
-                            email: formData.email,
-                            backend: 'built-in',
-                            responseTime: responseTime,
-                            n8nFailed: !!n8nErrorDetails,
-                            success: res.ok
-                        }
-                    })
-                }).catch(() => {}); // Ignore logging errors
-
-                console.log(`✅ Built-in API completed (${responseTime}ms)`);
-            }
+            const data = await res.json();
 
             if (!res.ok) {
                 // If it's a 500 with a specific error message, throw it
@@ -192,21 +78,6 @@ function OnboardingForm({ isUnified, onUserCreated }) {
             }
         } catch (err) {
             setError(err.message);
-
-            // Log the final error
-            await fetch('/api/log', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    level: 'error',
-                    message: 'User creation failed',
-                    metadata: {
-                        email: formData.email,
-                        error: err.message,
-                        backend: backendUsed || 'unknown'
-                    }
-                })
-            }).catch(() => {}); // Ignore logging errors
         } finally {
             setLoading(false);
         }
@@ -223,19 +94,6 @@ function OnboardingForm({ isUnified, onUserCreated }) {
                 <h2 style={{ color: isPartial ? '#f59e0b' : '#10b981' }}>
                     {isPartial ? "Partial Success" : "Success!"}
                 </h2>
-
-                {backendUsed && (
-                    <div style={{
-                        marginBottom: '1rem',
-                        padding: '0.5rem',
-                        backgroundColor: backendUsed === 'n8n' ? '#1e293b' : '#334155',
-                        borderRadius: '0.25rem',
-                        fontSize: '0.875rem',
-                        color: '#94a3b8'
-                    }}>
-                        {backendUsed === 'n8n' ? '⚡ Created via n8n workflow' : '🔧 Created via built-in API'}
-                    </div>
-                )}
 
                 {result.warning && (
                     <div className="warning-msg">

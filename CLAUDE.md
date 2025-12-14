@@ -5,7 +5,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 AutoBoard is an open-source Next.js application that automates employee onboarding by creating user accounts across both Google Workspace and Microsoft 365 simultaneously. Organizations can deploy this application to streamline their IT onboarding process. The application uses NextAuth.js for OAuth authentication and manages dual OAuth flows to allow users to connect both platforms.
-
 ## Development Commands
 
 ```bash

@@ -1,0 +1,441 @@
+{
+  "name": "AutoBoard",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "autoboard-onboard",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -688,
+        -8
+      ],
+      "id": "ddec3613-e384-4e07-b1ce-4abe33d064dd",
+      "name": "Webhook - Receive employee details",
+      "webhookId": "fe81b475-a414-44ea-aece-6d2b58c41caf",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "mfTbmk6iZEGtyWgU",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get results from previous nodes\nconst google = $('Google - Create User').first().json;\nconst microsoft = $('Microsoft - Create User').first().json;\nconst license = $('Assign License').first().json;\n\n// Get the specific password that was generated in the \"Set User Data\" step\nconst userData = $('Set User Data').first().json;\nconst generatedPassword = userData.temporaryPassword;\n\n// Helper to clean up messages (Same as before)\nconst getErrorMessage = (nodeJson, serviceName) => {\n  if (!nodeJson.error) return null;\n  const rawError = JSON.stringify(nodeJson.error).toLowerCase();\n  \n  if (rawError.includes('entity already exists') || \n      rawError.includes('userprincipalname already exists') || \n      rawError.includes('duplicate')) {\n    return `${serviceName}: User already exists (Skipped creation)`;\n  }\n  if (rawError.includes('password') && (rawError.includes('complexity') || rawError.includes('policy'))) {\n    return `${serviceName}: Password does not meet complexity requirements`;\n  }\n  if (rawError.includes('subscribedskus') || rawError.includes('license')) {\n    return `${serviceName}: No available licenses found`;\n  }\n  return `${serviceName} Error: ${nodeJson.error.message || 'Unknown error'}`;\n};\n\n// Build the final status report\nconst statusReport = {\n  user: userData.email,\n  // --- THIS IS THE NEW LINE ---\n  generatedPassword: generatedPassword, \n  // ----------------------------\n  success: !google.error && !microsoft.error,\n  googleStatus: google.error ? \"Failed\" : \"Created\",\n  microsoftStatus: microsoft.error ? \"Failed\" : \"Created\",\n  messages: []\n};\n\n// Push clean error messages\nif (google.error) statusReport.messages.push(getErrorMessage(google, 'Google'));\nif (microsoft.error) statusReport.messages.push(getErrorMessage(microsoft, 'Microsoft'));\nif (license && license.error) statusReport.messages.push(getErrorMessage(license, 'Licensing'));\n\nreturn statusReport;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        16
+      ],
+      "id": "c83f1107-c006-45a6-b459-100677d1cd54",
+      "name": "Merge results",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1328,
+        16
+      ],
+      "id": "c19d5245-9f2f-42d2-af00-2a40fd38421a",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0ea54209-6374-45e7-9866-d961c3b971c2",
+              "leftValue": "={{ $node[\"Set User Data\"].json.assignLicense }}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -16,
+        88
+      ],
+      "id": "56e72fb8-269f-4732-bc72-6f2c85d2d01c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/subscribedSkus",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        208,
+        16
+      ],
+      "id": "b9fa7bef-c1d7-4b37-8db0-57ec770ae2ad",
+      "name": "Get Available SKUs",
+      "credentials": {
+        "microsoftEntraOAuth2Api": {
+          "id": "SWKC2SlWjX21j3KS",
+          "name": "Microsoft Entra ID (Azure Active Directory) account"
+        },
+        "microsoftGraphSecurityOAuth2Api": {
+          "id": "2PO9y1vAwo9O1Wm0",
+          "name": "Microsoft Graph Security account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "firstName": "={{ $('Set User Data').first().json.firstName }}",
+        "lastName": "={{ $('Set User Data').first().json.lastName }}",
+        "password": "={{ $('Set User Data').first().json.temporaryPassword }}",
+        "username": "={{ $json.email.split('@')[0] }}",
+        "domain": "spines.com",
+        "additionalFields": {
+          "changePasswordAtNextLogin": true
+        }
+      },
+      "type": "n8n-nodes-base.gSuiteAdmin",
+      "typeVersion": 1,
+      "position": [
+        656,
+        -176
+      ],
+      "id": "575ff232-e3dd-4274-98f0-63ad6c1f7942",
+      "name": "Google - Create User",
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "I7S0X99Sf6VULYJ8",
+          "name": "Google Workspace Admin account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d7f19ad3-e3b7-48c2-9cdb-51389744c566",
+              "name": "firstName",
+              "value": "={{ $json.body.firstName }}",
+              "type": "string"
+            },
+            {
+              "id": "1e88e41d-2326-4622-a34e-4ee62882da02",
+              "name": "lastName",
+              "value": "={{ $json.body.lastName }}",
+              "type": "string"
+            },
+            {
+              "id": "329d8cde-8fa5-45d9-82bc-dbd2c466e276",
+              "name": "email",
+              "value": "={{ $json.body.email.toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "86f15680-c92e-4797-ade2-402084d4c80d",
+              "name": "jobTitle",
+              "value": "={{ $json.body.jobTitle }}",
+              "type": "string"
+            },
+            {
+              "id": "ef22ed1e-2ef3-4f9b-9f65-dd416a7f0465",
+              "name": "department",
+              "value": "={{ $json.body.department }}",
+              "type": "string"
+            },
+            {
+              "id": "a385ed3d-069d-4509-9a30-39711cc6e0b3",
+              "name": "usageLocation",
+              "value": "={{ $json.body.usageLocation || 'IL' }}",
+              "type": "string"
+            },
+            {
+              "id": "7afb9d4d-caed-434a-9c16-4c3cd5236fcc",
+              "name": "assignLicense",
+              "value": "={{ Boolean($json.body.assignLicense) }}",
+              "type": "string"
+            },
+            {
+              "id": "af9d7a7f-315a-400c-986c-b745b53a565d",
+              "name": "temporaryPassword",
+              "value": "={{ $json.body.password || 'Temp' + Math.random().toString(36).slice(-8) + '!A1' }}",
+              "type": "string"
+            },
+            {
+              "id": "953fa6e6-7489-4ecf-b2d3-3f6947fb0962",
+              "name": "displayName",
+              "value": "={{ $json.body.firstName + ' ' + $json.body.lastName }}",
+              "type": "string"
+            },
+            {
+              "id": "f8bd4b43-e7d2-40af-ac2a-d12045b2af77",
+              "name": "mailNickname",
+              "value": "={{ $json.body.email.split('@')[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -464,
+        -8
+      ],
+      "id": "cbe274db-701c-42d5-9839-1566cc929976",
+      "name": "Set User Data"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        0
+      ],
+      "id": "d52fa8d0-bcee-444c-9e5c-4e064ba8cbec",
+      "name": "Wait for All Branches"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the list of available SKUs from previous node\n  const skus = $input.first().json.value;\n\n  // Define which license you want to assign\n  // Change this to match YOUR organization's license!\n  const targetSku = 'O365_BUSINESS_PREMIUM';\n\n  // Find the SKU that matches our target\n  const sku = skus.find(s => s.skuPartNumber === targetSku);\n\n  // If SKU not found, throw error\n  if (!sku) {\n    throw new Error(`License '${targetSku}' not found in your organization`);\n  }\n\n  // Check if licenses are available\n  const available = sku.prepaidUnits.enabled - sku.consumedUnits;\n\n  if (available <= 0) {\n    throw new Error(`No available licenses for ${sku.skuPartNumber}. You have\n  ${sku.consumedUnits}/${sku.prepaidUnits.enabled} licenses in use.`);\n  }\n\n  // Get the user ID from the workflow execution data\n  // The Microsoft user was created earlier in the workflow\n  const microsoftUserData = $node[\"Microsoft - Create User\"].json;\n  const userId = microsoftUserData.id;\n\n  // Return the SKU ID and user ID for the next node\n  return {\n    skuId: sku.skuId,\n    skuPartNumber: sku.skuPartNumber,\n    available: available,\n    userId: userId\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        16
+      ],
+      "id": "f3194f7c-efc6-414b-a7ba-c317fb32d95e",
+      "name": "Resolve SKU ID",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"https://graph.microsoft.com/v1.0/users/\" + $json.userId + \"/assignLicense\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"addLicenses\": [\n    {\n      \"disabledPlans\": [],\n      \"skuId\": \"{{ $json.skuId }}\"\n    }\n  ],\n  \"removeLicenses\": []\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        656,
+        16
+      ],
+      "id": "b4405121-a821-42a9-aa77-ea8d8bef012e",
+      "name": "Assign License",
+      "credentials": {
+        "microsoftGraphSecurityOAuth2Api": {
+          "id": "2PO9y1vAwo9O1Wm0",
+          "name": "Microsoft Graph Security account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.microsoft.com/v1.0/users",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"accountEnabled\": true,\n    \"displayName\": \"{{ $('Set User Data').first().json.displayName }}\",\n    \"mailNickname\": \"{{ $('Set User Data').first().json.mailNickname }}\",\n    \"userPrincipalName\": \"{{ $('Set User Data').first().json.email }}\",\n    \"passwordProfile\": {\n      \"forceChangePasswordNextSignIn\": true,\n      \"password\": \"{{ $('Set User Data').first().json.temporaryPassword }}\"\n    },\n    \"givenName\": \"{{ $('Set User Data').first().json.firstName }}\",\n    \"surname\": \"{{ $('Set User Data').first().json.lastName }}\",\n    \"jobTitle\": \"{{ $('Set User Data').first().json.jobTitle }}\",\n    \"department\": \"{{ $('Set User Data').first().json.department }}\",\n    \"usageLocation\": \"{{ $('Set User Data').first().json.usageLocation }}\"\n  }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -240,
+        88
+      ],
+      "id": "e915bfdb-4fec-45a0-ad1d-0d8d8c4006bd",
+      "name": "Microsoft - Create User",
+      "credentials": {
+        "microsoftGraphSecurityOAuth2Api": {
+          "id": "2PO9y1vAwo9O1Wm0",
+          "name": "Microsoft Graph Security account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Receive employee details": {
+      "main": [
+        [
+          {
+            "node": "Set User Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge results": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get Available SKUs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for All Branches",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Get Available SKUs": {
+      "main": [
+        [
+          {
+            "node": "Resolve SKU ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google - Create User": {
+      "main": [
+        [
+          {
+            "node": "Wait for All Branches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set User Data": {
+      "main": [
+        [
+          {
+            "node": "Google - Create User",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Microsoft - Create User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for All Branches": {
+      "main": [
+        [
+          {
+            "node": "Merge results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve SKU ID": {
+      "main": [
+        [
+          {
+            "node": "Assign License",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign License": {
+      "main": [
+        [
+          {
+            "node": "Wait for All Branches",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Microsoft - Create User": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Jerusalem",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "d4e11b4f-b7f8-4961-83cd-cd012b03c49b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d5e596dc4e14c9671997af6bf37a4ff1617791c0195f35bfbfc7868a23b27c77"
+  },
+  "id": "uOrARDQjJNyR22vV",
+  "tags": []
+}

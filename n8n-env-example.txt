@@ -1,0 +1,2 @@
+# Add this to your n8n .env file (usually at ~/.n8n/.env)
+N8N_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000

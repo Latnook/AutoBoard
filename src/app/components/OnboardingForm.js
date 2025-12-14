@@ -76,10 +76,12 @@ function OnboardingForm({ isUnified, onUserCreated }) {
 
                     const n8nHeaders = { "Content-Type": "application/json" };
 
-                    // Add API key if configured
-                    const n8nApiKey = process.env.NEXT_PUBLIC_N8N_API_KEY;
-                    if (n8nApiKey) {
-                        n8nHeaders["X-API-Key"] = n8nApiKey;
+                    // Add Basic Auth if credentials are configured
+                    const n8nUsername = process.env.NEXT_PUBLIC_N8N_USERNAME;
+                    const n8nPassword = process.env.NEXT_PUBLIC_N8N_PASSWORD;
+                    if (n8nUsername && n8nPassword) {
+                        const credentials = btoa(`${n8nUsername}:${n8nPassword}`);
+                        n8nHeaders["Authorization"] = `Basic ${credentials}`;
                     }
 
                     const startTime = Date.now();
@@ -96,6 +98,25 @@ function OnboardingForm({ isUnified, onUserCreated }) {
                     }
 
                     data = await res.json();
+
+                    // Normalize n8n response format to match built-in API
+                    if (data.generatedPassword && !data.temporaryPassword) {
+                        data.temporaryPassword = data.generatedPassword;
+                    }
+                    if (data.googleStatus && data.microsoftStatus && !data.results) {
+                        // Convert old format to new format
+                        data.results = {
+                            google: data.googleStatus === "Created" ? { primaryEmail: data.user } : null,
+                            microsoft: data.microsoftStatus === "Created" ? {
+                                userPrincipalName: data.user,
+                                licenseAssigned: data.licenseStatus === "Assigned" || data.success // Assume license worked if overall success
+                            } : null
+                        };
+                    }
+                    if (data.messages && !data.errors) {
+                        data.errors = data.messages;
+                    }
+
                     usedN8n = true;
                     setBackendUsed('n8n');
                     console.log(`✅ n8n webhook succeeded (${responseTime}ms)`);

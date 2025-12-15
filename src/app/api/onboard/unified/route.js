@@ -5,16 +5,38 @@ import { generatePassword } from "@/lib/utils";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { logger } from "@/lib/logger";
+import { logAuditEvent } from "@/lib/audit-logger";
+import { headers } from "next/headers";
 
 export async function POST(req) {
-    const token = await getToken({ req });
+    // Get IP address for audit logging
+    const headersList = await headers();
+    const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown';
 
-    if (!token || !token.accessToken) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Check for API key authentication (for n8n)
+    const apiKey = headersList.get('x-api-key');
+    const expectedApiKey = process.env.API_KEY;
 
-    if (token.error === "RefreshAccessTokenError") {
-        return NextResponse.json({ error: "Session expired. Please sign out and sign in again." }, { status: 401 });
+    let isApiKeyAuth = false;
+    let authenticatedUser = 'system'; // Default for API key auth
+    let token = null;
+
+    if (apiKey && expectedApiKey && apiKey === expectedApiKey) {
+        // Valid API key authentication
+        isApiKeyAuth = true;
+    } else {
+        // Fall back to NextAuth session authentication
+        token = await getToken({ req });
+
+        if (!token || !token.accessToken) {
+            return NextResponse.json({ error: "Unauthorized - missing valid session or API key" }, { status: 401 });
+        }
+
+        if (token.error === "RefreshAccessTokenError") {
+            return NextResponse.json({ error: "Session expired. Please sign out and sign in again." }, { status: 401 });
+        }
+
+        authenticatedUser = token.email;
     }
 
     // Determine which token is primary and which is secondary
@@ -25,10 +47,10 @@ export async function POST(req) {
     const secondaryGoogle = cookieStore.get("secondary_google_token");
     const secondaryMicrosoft = cookieStore.get("secondary_microsoft_token");
 
-    if (token.provider === 'google') {
+    if (token && token.provider === 'google') {
         googleToken = token.accessToken;
         microsoftToken = secondaryMicrosoft?.value;
-    } else if (token.provider === 'azure-ad') {
+    } else if (token && token.provider === 'azure-ad') {
         microsoftToken = token.accessToken;
         googleToken = secondaryGoogle?.value;
     }
@@ -138,6 +160,20 @@ export async function POST(req) {
         if (!isPartialSuccess && results.errors.length > 0) {
             // Total failure
             logger.error(`Unified onboarding failed for ${email}`, { errors: results.errors });
+
+            // Log audit event for failed creation
+            logAuditEvent({
+                action: 'USER_CREATION_FAILED',
+                targetEmail: email,
+                performedBy: authenticatedUser,
+                ipAddress,
+                success: false,
+                details: {
+                    errors: results.errors,
+                    provider: token?.provider || 'api-key'
+                }
+            });
+
             return NextResponse.json({
                 success: false,
                 errors: results.errors,
@@ -149,6 +185,23 @@ export async function POST(req) {
             google: !!results.google,
             microsoft: !!results.microsoft,
             license: results.microsoft?.licenseAssigned
+        });
+
+        // Log audit event for successful creation
+        logAuditEvent({
+            action: 'USER_CREATED',
+            targetEmail: email,
+            performedBy: authenticatedUser,
+            ipAddress,
+            success: true,
+            details: {
+                googleCreated: !!results.google,
+                microsoftCreated: !!results.microsoft,
+                licenseAssigned: results.microsoft?.licenseAssigned,
+                adminUnitAssigned: results.microsoft?.adminUnitAssigned,
+                provider: token?.provider || 'api-key',
+                errors: results.errors.length > 0 ? results.errors : undefined
+            }
         });
 
         return NextResponse.json({

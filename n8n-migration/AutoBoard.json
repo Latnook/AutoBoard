@@ -5,34 +5,27 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "autoboard-onboard",
-        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -688,
-        88
+        -1040,
+        -16
       ],
       "id": "ddec3613-e384-4e07-b1ce-4abe33d064dd",
       "name": "Webhook - Receive employee details",
-      "webhookId": "fe81b475-a414-44ea-aece-6d2b58c41caf",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "mfTbmk6iZEGtyWgU",
-          "name": "Header Auth account"
-        }
-      }
+      "webhookId": "fe81b475-a414-44ea-aece-6d2b58c41caf"
     },
     {
       "parameters": {
-        "jsCode": "  // Get results from all branches\n  const allItems = $input.all();\n\n  // Find each result by checking the structure\n  let googleResult = null;\n  let microsoftResult = null;\n  let userData = null;\n  let licenseResult = null;\n\n  // Extract data from the merged items\n  for (const item of allItems) {\n    const data = item.json;\n\n    // Google result has primaryEmail or is from Google node\n    if (data.primaryEmail || data.kind === 'admin#directory#user') {\n      googleResult = data;\n    }\n    // Microsoft result has userPrincipalName or @odata.context\n    else if (data.userPrincipalName || data['@odata.context']) {\n      microsoftResult = data;\n    }\n  }\n\n  // Get user data from Set User Data node\n  userData = $('Set User Data').first().json;\n\n  // Build response for frontend\n  const results = {\n    success: true,\n    temporaryPassword: userData.temporaryPassword,\n    results: {\n      google: null,\n      microsoft: null\n    },\n    errors: []\n  };\n\n  // Process Google\n  if (googleResult && !googleResult.error) {\n    results.results.google = {\n      primaryEmail: userData.email,\n      id: googleResult.id || googleResult.userId,\n      ...googleResult\n    };\n  } else if (googleResult?.error) {\n    results.errors.push(`Google: ${googleResult.error.message || googleResult.message}`);\n  }\n\n  // Process Microsoft\n  if (microsoftResult && !microsoftResult.error) {\n    results.results.microsoft = {\n      userPrincipalName: userData.email,\n      id: microsoftResult.id,\n      licenseAssigned: false,\n      ...microsoftResult\n    };\n  } else if (microsoftResult?.error) {\n    results.errors.push(`Microsoft: ${microsoftResult.error.message || microsoftResult.message}`);\n  }\n\n  // Overall success if at least one platform succeeded\n  results.success = results.results.google !== null || results.results.microsoft !== null;\n\n  return results;"
+        "jsCode": "// Get results from previous nodes\nconst google = $('Google - Create User').first().json;\nconst microsoft = $('Microsoft - Create User').first().json;\nconst license = $('Assign License').first().json;\n\n// Get the specific password that was generated in the \"Set User Data\" step\nconst userData = $('Set User Data').first().json;\nconst generatedPassword = userData.temporaryPassword;\n\n// Helper to clean up messages (Same as before)\nconst getErrorMessage = (nodeJson, serviceName) => {\n  if (!nodeJson.error) return null;\n  const rawError = JSON.stringify(nodeJson.error).toLowerCase();\n  \n  if (rawError.includes('entity already exists') || \n      rawError.includes('userprincipalname already exists') || \n      rawError.includes('duplicate')) {\n    return `${serviceName}: User already exists (Skipped creation)`;\n  }\n  if (rawError.includes('password') && (rawError.includes('complexity') || rawError.includes('policy'))) {\n    return `${serviceName}: Password does not meet complexity requirements`;\n  }\n  if (rawError.includes('subscribedskus') || rawError.includes('license')) {\n    return `${serviceName}: No available licenses found`;\n  }\n  return `${serviceName} Error: ${nodeJson.error.message || 'Unknown error'}`;\n};\n\n// Build the final status report\nconst statusReport = {\n  user: userData.email,\n  // --- THIS IS THE NEW LINE ---\n  generatedPassword: generatedPassword, \n  // ----------------------------\n  success: !google.error && !microsoft.error,\n  googleStatus: google.error ? \"Failed\" : \"Created\",\n  microsoftStatus: microsoft.error ? \"Failed\" : \"Created\",\n  messages: []\n};\n\n// Push clean error messages\nif (google.error) statusReport.messages.push(getErrorMessage(google, 'Google'));\nif (microsoft.error) statusReport.messages.push(getErrorMessage(microsoft, 'Microsoft'));\nif (license && license.error) statusReport.messages.push(getErrorMessage(license, 'Licensing'));\n\nreturn statusReport;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2000,
+        976,
         16
       ],
       "id": "c83f1107-c006-45a6-b459-100677d1cd54",
@@ -46,8 +39,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        2224,
-        16
+        1200,
+        -112
       ],
       "id": "c19d5245-9f2f-42d2-af00-2a40fd38421a",
       "name": "Respond to Webhook"
@@ -80,8 +73,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        880,
-        88
+        -144,
+        96
       ],
       "id": "56e72fb8-269f-4732-bc72-6f2c85d2d01c",
       "name": "If"
@@ -96,7 +89,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1104,
+        80,
         16
       ],
       "id": "b9fa7bef-c1d7-4b37-8db0-57ec770ae2ad",
@@ -118,7 +111,7 @@
         "firstName": "={{ $('Set User Data').first().json.firstName }}",
         "lastName": "={{ $('Set User Data').first().json.lastName }}",
         "password": "={{ $('Set User Data').first().json.temporaryPassword }}",
-        "username": "={{ $json.email.split('@')[0] }}",
+        "username": "={{ $('Set User Data').first().json.email.split('@')[0] }}",
         "domain": "spines.com",
         "additionalFields": {
           "changePasswordAtNextLogin": true
@@ -127,7 +120,7 @@
       "type": "n8n-nodes-base.gSuiteAdmin",
       "typeVersion": 1,
       "position": [
-        1552,
+        528,
         -176
       ],
       "id": "575ff232-e3dd-4274-98f0-63ad6c1f7942",
@@ -211,8 +204,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -464,
-        88
+        -816,
+        -16
       ],
       "id": "cbe274db-701c-42d5-9839-1566cc929976",
       "name": "Set User Data"
@@ -224,7 +217,7 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        1776,
+        752,
         0
       ],
       "id": "d52fa8d0-bcee-444c-9e5c-4e064ba8cbec",
@@ -237,11 +230,12 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1328,
+        304,
         16
       ],
       "id": "f3194f7c-efc6-414b-a7ba-c317fb32d95e",
-      "name": "Resolve SKU ID"
+      "name": "Resolve SKU ID",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -257,7 +251,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1552,
+        528,
         16
       ],
       "id": "b4405121-a821-42a9-aa77-ea8d8bef012e",
@@ -267,7 +261,8 @@
           "id": "2PO9y1vAwo9O1Wm0",
           "name": "Microsoft Graph Security account"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -283,8 +278,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        656,
-        88
+        -368,
+        96
       ],
       "id": "e915bfdb-4fec-45a0-ad1d-0d8d8c4006bd",
       "name": "Microsoft - Create User",
@@ -298,122 +293,73 @@
     },
     {
       "parameters": {
-        "url": "=https://admin.googleapis.com/admin/directory/v1/users/{{ $json.email }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gSuiteAdminOAuth2Api",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        -240,
-        -8
-      ],
-      "id": "36846aeb-9dc9-4139-8068-93a45c463c4f",
-      "name": "Check Google User Exist",
-      "credentials": {
-        "gSuiteAdminOAuth2Api": {
-          "id": "I7S0X99Sf6VULYJ8",
-          "name": "Google Workspace Admin account"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "url": "=https://graph.microsoft.com/v1.0/users/{{ $('Set User Data').item.json.email }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "microsoftGraphSecurityOAuth2Api",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        -240,
-        184
-      ],
-      "id": "19c537e0-c8cd-4427-9b98-a1c317b167d3",
-      "name": "Check Microsoft User Exists",
-      "credentials": {
-        "microsoftGraphSecurityOAuth2Api": {
-          "id": "2PO9y1vAwo9O1Wm0",
-          "name": "Microsoft Graph Security account"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "const email = $('Set User Data').first().json.email;\n  const inputs = $input.all();\n\n  // Get both check results from inputs\n  const googleCheck = inputs.find(item => item.json.kind === 'admin#directory#user') || inputs[0];\n  const microsoftCheck = inputs.find(item => item.json['@odata.context']) || inputs[1];\n\n  // Simpler check: if there's no error and there's an id, user exists\n  const existsInGoogle = googleCheck?.json?.id && !googleCheck?.json?.error;\n  const existsInMicrosoft = microsoftCheck?.json?.id && !microsoftCheck?.json?.error;\n\n  if (existsInGoogle || existsInMicrosoft) {\n    const locations = [];\n    if (existsInGoogle) locations.push('Google Workspace');\n    if (existsInMicrosoft) locations.push('Microsoft 365');\n\n    return {\n      userExists: true,\n      email: email,\n      locations: locations\n    };\n  }\n\n  // User doesn't exist anywhere\n  return {\n    userExists: false,\n    email: email\n  };"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        208,
-        88
-      ],
-      "id": "8165bd9c-d67c-4bf4-9a97-17c90668de29",
-      "name": "Does the user exist?",
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
+        "method": "POST",
+        "url": "http://localhost:3000/api/rate-limit/check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
             {
-              "id": "defaee3c-1980-4249-90f6-a820bdf8c052",
-              "leftValue": "={{ $json.userExists }}",
-              "rightValue": false,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
+              "name": "X-API-Key",
+              "value": "DfkN%OY8jwsj77#2!kLH"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        432,
-        88
+        -592,
+        -16
       ],
-      "id": "ba218abc-c8a5-41c8-85c2-bc038c0a51e5",
-      "name": "Proceed?"
+      "id": "86c0183c-dc1f-4a1f-ba48-93b4c763cce0",
+      "name": "Check Rate Limit",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "{\n    \"success\": false,\n    \"error\": \"User already exists\",\n    \"email\": \"{{ $json.email }}\",\n    \"existsIn\": \"{{ $json.locations.join(' and ') }}\"\n  }",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        656,
-        280
+        -1040,
+        320
       ],
-      "id": "a4bc579e-66b2-4f2a-994e-84c2cd60b4f2",
-      "name": "The user exists"
+      "id": "bc47e6e1-fdcc-4e32-95c1-8f2116309e0c",
+      "name": "Rate limit reached"
     },
     {
-      "parameters": {},
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/rate-limit/check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "DfkN%OY8jwsj77#2!kLH"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"action\": \"USER_CREATED\",\n    \"targetEmail\": \"{{ $('Set User Data').first().json.email }}\",\n    \"performedBy\": \"n8n-workflow\",\n    \"success\": \"{{ $('Merge results').first().json.success }}\",\n    \"details\": {\n      \"googleCreated\": \"{{ $('Merge results').first().json.results.google !== null }}\",\n      \"microsoftCreated\": \"{{ $('Merge results').first().json.results.microsoft !== null }}\",\n      \"licenseAssigned\": \"{{ $('Merge results').first().json.results.microsoft?.licenseAssigned }}\"\n    }\n  }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        -16,
-        88
+        1200,
+        96
       ],
-      "id": "1a115d45-aeb0-4b0b-b542-167e13789ff2",
-      "name": "Merge"
+      "id": "c1ecd762-729f-4cdc-ad9a-10d2a338e04f",
+      "name": "Log Audit",
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -434,6 +380,11 @@
         [
           {
             "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Audit",
             "type": "main",
             "index": 0
           }
@@ -484,12 +435,7 @@
       "main": [
         [
           {
-            "node": "Check Google User Exist",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Check Microsoft User Exists",
+            "node": "Check Rate Limit",
             "type": "main",
             "index": 0
           }
@@ -540,40 +486,7 @@
         ]
       ]
     },
-    "Check Google User Exist": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Microsoft User Exists": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Does the user exist?": {
-      "main": [
-        [
-          {
-            "node": "Proceed?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Proceed?": {
+    "Check Rate Limit": {
       "main": [
         [
           {
@@ -587,36 +500,23 @@
             "index": 0
           }
         ],
-        [
-          {
-            "node": "The user exists",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
-    "Merge": {
+    "Log Audit": {
       "main": [
-        [
-          {
-            "node": "Does the user exist?",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "timezone": "Asia/Jerusalem",
     "callerPolicy": "workflowsFromSameOwner",
-    "executionTimeout": -1,
     "availableInMCP": false
   },
-  "versionId": "d4e11b4f-b7f8-4961-83cd-cd012b03c49b",
+  "versionId": "bb33a2f2-17a6-44c0-af22-093714714ea6",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d5e596dc4e14c9671997af6bf37a4ff1617791c0195f35bfbfc7868a23b27c77"

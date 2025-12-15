@@ -61,10 +61,14 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-## Branches
+## Integration Options
 
-- **`main`**: Production-ready version with all features and security improvements
-- **`n8n-integration`**: Includes n8n workflow automation integration (see `n8n-migration/` folder)
+AutoBoard works great out of the box with its built-in Next.js API routes. For advanced automation needs, you can optionally integrate with n8n:
+
+- **Built-in API** (Recommended): OAuth-based authentication, integrated dashboard, simple deployment
+- **n8n Integration** (Optional): Visual workflow editor, 400+ pre-built integrations, execution history
+
+See `n8n-OPTIONAL.md` for n8n setup instructions.
 
 ## Security
 

@@ -7,6 +7,7 @@ import { cookies } from "next/headers";
 import { logger } from "@/lib/logger";
 import { logAuditEvent } from "@/lib/audit-logger";
 import { headers } from "next/headers";
+import { getRateLimitStatus } from "@/lib/rate-limiter";
 
 export async function POST(req) {
     // Get IP address for audit logging
@@ -204,11 +205,21 @@ export async function POST(req) {
             }
         });
 
+        // Get current rate limit status (without incrementing)
+        const identifier = isApiKeyAuth ? (req.ip || 'n8n-workflow') : authenticatedUser;
+        const rateLimitStatus = getRateLimitStatus(identifier);
+
         return NextResponse.json({
             success: true,
             results,
             errors: results.errors, // Include errors even on success/partial success
-            temporaryPassword: password
+            temporaryPassword: password,
+            rateLimit: {
+                remaining: rateLimitStatus.remaining,
+                limit: rateLimitStatus.limit,
+                resetAt: rateLimitStatus.resetAt,
+                resetIn: rateLimitStatus.resetIn
+            }
         });
 
     } catch (error) {

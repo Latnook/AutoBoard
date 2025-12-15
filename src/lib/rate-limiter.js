@@ -63,13 +63,15 @@ export function checkRateLimit(identifier) {
 /**
  * Get current rate limit status without incrementing
  * @param {string} identifier - IP address or user email
- * @returns {Object} - { remaining: number, resetAt: timestamp }
+ * @returns {Object} - { remaining: number, resetAt: timestamp, resetIn: milliseconds }
  */
 export function getRateLimitStatus(identifier) {
     if (!limiters.has(identifier)) {
+        const resetAt = Date.now() + RATE_LIMIT_WINDOW_MS;
         return {
             remaining: MAX_REQUESTS_PER_WINDOW,
-            resetAt: Date.now() + RATE_LIMIT_WINDOW_MS,
+            resetAt: resetAt,
+            resetIn: RATE_LIMIT_WINDOW_MS,
             limit: MAX_REQUESTS_PER_WINDOW
         };
     }
@@ -78,9 +80,11 @@ export function getRateLimitStatus(identifier) {
 
     // Reset if window expired
     if (Date.now() > limiter.resetAt) {
+        const resetAt = Date.now() + RATE_LIMIT_WINDOW_MS;
         return {
             remaining: MAX_REQUESTS_PER_WINDOW,
-            resetAt: Date.now() + RATE_LIMIT_WINDOW_MS,
+            resetAt: resetAt,
+            resetIn: RATE_LIMIT_WINDOW_MS,
             limit: MAX_REQUESTS_PER_WINDOW
         };
     }
@@ -88,6 +92,7 @@ export function getRateLimitStatus(identifier) {
     return {
         remaining: Math.max(0, MAX_REQUESTS_PER_WINDOW - limiter.count),
         resetAt: limiter.resetAt,
+        resetIn: limiter.resetAt - Date.now(),
         limit: MAX_REQUESTS_PER_WINDOW
     };
 }

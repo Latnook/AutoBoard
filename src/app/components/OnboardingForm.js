@@ -305,6 +305,24 @@ function OnboardingForm({ isUnified, onUserCreated }) {
                     </div>
                 )}
 
+                {result.rateLimit && (
+                    <div style={{
+                        marginTop: '1.5rem',
+                        padding: '1rem',
+                        backgroundColor: '#1e293b',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #475569'
+                    }}>
+                        <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#94a3b8' }}>Rate Limit Status:</p>
+                        <p style={{ fontSize: '0.95rem' }}>
+                            <strong>{result.rateLimit.remaining}</strong> of <strong>{result.rateLimit.limit}</strong> requests remaining
+                        </p>
+                        <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                            Resets in {Math.ceil(result.rateLimit.resetIn / 60000)} minutes
+                        </p>
+                    </div>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
                     <button onClick={() => setResult(null)} className="btn btn-primary">
                         Onboard Another User

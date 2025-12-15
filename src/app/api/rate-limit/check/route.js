@@ -59,6 +59,7 @@ export async function POST(req) {
         message: "Rate limit OK - proceed with user creation",
         remaining: limitStatus.remaining,
         limit: limitStatus.limit,
-        resetAt: limitStatus.resetAt
+        resetAt: limitStatus.resetAt,
+        resetIn: limitStatus.resetAt - Date.now() // Add resetIn in milliseconds
     });
 }

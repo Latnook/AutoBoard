@@ -1,0 +1,33 @@
+MIME-Version: 1.0
+Date: Mon, 01 Jan 2024 10:00:00 +0000
+Message-ID: <example3@mail.example.com>
+Subject: New Hire Onboarding: David Cohen - Product Manager - Israel
+From: HR Department <hr@company.com>
+To: IT Automation <it-automation@company.com>
+Content-Type: multipart/alternative; boundary="000000000000example3"
+
+--000000000000example3
+Content-Type: text/plain; charset="UTF-8"
+
+Hi team,
+
+Please begin onboarding for our new hire:
+
+Given Name: David
+Surname: Ben Yosef
+Personal Email Address: david.cohen@personal-email.com
+Manager: Sarah Levi
+Position: Product Manager
+Department: Product
+Employee ID: EMP003
+Start Date: 01/15/2024
+Phone Number: +972-50-555-0300
+
+Thanks!
+
+--000000000000example3
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">Hi team,<br><br>Please begin onboarding for our new hire:<br><br>Given Name: David<br>Surname: Ben Yosef<br>Personal Email Address: <a href="mailto:david.cohen@personal-email.com">david.cohen@personal-email.com</a><br>Manager: Sarah Levi<br>Position: Product Manager<br>Department: Product<br>Employee ID: EMP003<br>Start Date: 01/15/2024<br>Phone Number: +972-50-555-0300<br><br>Thanks!</div>
+
+--000000000000example3--

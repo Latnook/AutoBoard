@@ -97,25 +97,29 @@ graph TD
     G -->|Yes| H[Get Available SKUs]
     H --> I[Resolve SKU ID]
     I --> J[Assign License]
-    J --> K[Merge Results]
+    J --> K[Wait for All Branches]
     G -->|No| K
-    K --> L[Log Audit Event]
-    L --> M[Respond with Results]
+    K --> L[Get Rate Limit Status]
+    L --> M[Merge Results]
+    M --> N[Log Audit Event]
+    M --> O[Respond with Results]
 ```
 
 ### Workflow Steps
 
 1. **Webhook Trigger** - Receives employee data via HTTP POST
 2. **Set User Data** - Normalizes and prepares user information
-3. **Rate Limit Check** - Calls `/api/rate-limit/check` to prevent abuse (stops if limit exceeded)
+3. **Rate Limit Check** - Calls `/api/rate-limit/check` to prevent abuse (stops if limit exceeded, increments counter)
 4. **Create Google User** - Creates user in Google Workspace (continues on error)
 5. **Create Microsoft User** - Creates user in Microsoft 365 (continues on error)
 6. **Get Available SKUs** - Fetches available licenses (if license assignment requested)
 7. **Resolve SKU ID** - Maps license name to GUID
 8. **Assign License** - Assigns Microsoft 365 license to new user
-9. **Merge Results** - Combines results from both platforms
-10. **Log Audit Event** - Calls `/api/audit/log` to record the action
-11. **Respond with Results** - Returns success/failure status and temporary password
+9. **Wait for All Branches** - Waits for all parallel operations to complete
+10. **Get Rate Limit Status** - Calls `/api/rate-limit/status` to get final status (does NOT increment counter)
+11. **Merge Results** - Combines results from both platforms and includes rate limit info
+12. **Log Audit Event** - Calls `/api/audit/log` to record the action
+13. **Respond with Results** - Returns success/failure status, temporary password, and rate limit status
 
 ### Security Features
 
@@ -124,6 +128,26 @@ The workflow integrates with AutoBoard's built-in security:
 - **Rate Limiting**: Shares the same 10 users/hour limit as the web UI
 - **Audit Logging**: All user creations are logged to `logs/audit.log`
 - **API Key Authentication**: Prevents unauthorized workflow execution
+
+### Rate Limit API Endpoints
+
+AutoBoard provides two rate limit endpoints for n8n integration:
+
+**`/api/rate-limit/check` (POST)**
+- **Purpose**: Check if rate limit allows the operation AND increment the counter
+- **When to use**: At the beginning of the workflow to verify quota is available
+- **Behavior**: Increments the counter by 1 each time it's called
+- **Returns**: `{ allowed, remaining, limit, resetAt, resetIn }` or 429 error if limit exceeded
+
+**`/api/rate-limit/status` (POST)**
+- **Purpose**: Get current rate limit status WITHOUT incrementing the counter
+- **When to use**: After user creation to display current status to the user
+- **Behavior**: Only reads the current state, does not modify the counter
+- **Returns**: `{ remaining, limit, resetAt, resetIn }`
+
+Both endpoints require the `X-API-Key` header for authentication.
+
+**Important**: Always use `/check` at the start (to enforce the limit) and `/status` at the end (to show current status). Using `/check` twice will deduct 2 requests instead of 1!
 
 ## Workflow Customization
 
@@ -150,6 +174,88 @@ Example Slack message:
 ✅ New user created: {{ $('Set User Data').first().json.email }}
 🔑 Temporary password: {{ $('Merge Results').first().json.temporaryPassword }}
 ```
+
+### Configuring Rate Limit Status Display
+
+To show users how many requests they have remaining after creating a user, configure the "Get Rate Limit Status" node:
+
+**Node Configuration:**
+
+1. After "Wait for All Branches" node, add an **HTTP Request** node
+2. Name it "Get Rate Limit Status"
+3. Configure:
+   - **Method**: `POST`
+   - **URL**: `http://localhost:3000/api/rate-limit/status` (use `/status`, NOT `/check`)
+   - **Authentication**: None
+   - **Headers**: Add header `X-API-Key` with your API key value
+   - **Continue on Error**: Enable (workflow should respond even if this fails)
+
+**Update "Merge Results" Node:**
+
+Add rate limit info to the response by including this in your JavaScript code:
+
+```javascript
+// Get rate limit status
+const rateLimitData = $('Get Rate Limit Status').first().json;
+
+// In your return statement, add:
+rateLimit: rateLimitData && !rateLimitData.error ? {
+  remaining: rateLimitData.remaining,
+  limit: rateLimitData.limit,
+  resetAt: rateLimitData.resetAt,
+  resetIn: rateLimitData.resetIn
+} : null
+```
+
+This will display "X of Y requests remaining" and "Resets in Z minutes" in the frontend after user creation.
+
+**Important**: Use `/api/rate-limit/status` (not `/check`) to avoid incrementing the counter twice!
+
+### Adding Automatic Google Group Membership by Location
+
+You can modify the workflow to automatically add users to specific Google Groups based on their location. Here's how to add users from Israel to the location-group@company.com group:
+
+**Step 1: Add a Conditional Node**
+
+1. In n8n, click the **+** button after the "Google - Create User" node
+2. Select **Flow** → **If** node
+3. Name it "Check Location"
+4. Configure the condition:
+   - **Value 1**: `={{ $node["Set User Data"].json.usageLocation }}`
+   - **Operation**: `equals`
+   - **Value 2**: `IL`
+
+**Step 2: Add Google Group Membership Node**
+
+1. Connect the **true** output of "Check Location" to a new node
+2. Select **HTTP Request** node
+3. Name it "Add to Location Group"
+4. Configure the request:
+   - **Method**: `POST`
+   - **URL**: `https://admin.googleapis.com/admin/directory/v1/groups/location-group@company.com/members`
+   - **Authentication**: Select your Google Workspace Admin credential
+   - **Send Body**: Enable
+   - **Body Content Type**: JSON
+   - **JSON Body**:
+     ```json
+     {
+       "email": "{{ $('Set User Data').first().json.email }}",
+       "role": "MEMBER"
+     }
+     ```
+5. In **Node Settings** → **Error Handling**: Enable "Continue on Error"
+
+**Step 3: Reconnect the Workflow**
+
+1. Connect "Add to Location Group" output to "Wait for All Branches" (input 0)
+2. Connect the **false** output of "Check Location" to "Wait for All Branches" (input 0)
+3. This ensures the workflow continues whether the user is from Israel or not
+
+**Required Google Workspace Permission:**
+
+The Google credential needs the `https://www.googleapis.com/auth/admin.directory.group` scope to manage group memberships.
+
+**Note**: This is a custom modification specific to your organization and is not included in the generic open-source version.
 
 ### Using with Google Sheets
 

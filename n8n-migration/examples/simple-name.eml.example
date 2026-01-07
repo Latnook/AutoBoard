@@ -1,0 +1,33 @@
+MIME-Version: 1.0
+Date: Mon, 01 Jan 2024 10:00:00 +0000
+Message-ID: <example1@mail.example.com>
+Subject: New Hire Onboarding: John Doe - Software Engineer - United States
+From: HR Department <hr@company.com>
+To: IT Automation <it-automation@company.com>
+Content-Type: multipart/alternative; boundary="000000000000example1"
+
+--000000000000example1
+Content-Type: text/plain; charset="UTF-8"
+
+Hi team,
+
+Please begin onboarding for our new hire:
+
+Given Name: John
+Surname: Doe
+Personal Email Address: john.doe@personal-email.com
+Manager: Jane Smith
+Position: Software Engineer
+Department: Engineering
+Employee ID: EMP001
+Start Date: 01/15/2024
+Phone Number: +1-555-0100
+
+Thanks!
+
+--000000000000example1
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">Hi team,<br><br>Please begin onboarding for our new hire:<br><br>Given Name: John<br>Surname: Doe<br>Personal Email Address: <a href="mailto:john.doe@personal-email.com">john.doe@personal-email.com</a><br>Manager: Jane Smith<br>Position: Software Engineer<br>Department: Engineering<br>Employee ID: EMP001<br>Start Date: 01/15/2024<br>Phone Number: +1-555-0100<br><br>Thanks!</div>
+
+--000000000000example1--

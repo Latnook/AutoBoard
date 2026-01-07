@@ -1,0 +1,34 @@
+MIME-Version: 1.0
+Date: Mon, 01 Jan 2024 10:00:00 +0000
+Message-ID: <example2@mail.example.com>
+Subject: New Hire Onboarding: Maria Garcia Lopez - Sales Development Representative - Argentina
+From: HR Department <hr@company.com>
+To: IT Automation <it-automation@company.com>
+Content-Type: multipart/alternative; boundary="000000000000example2"
+
+--000000000000example2
+Content-Type: text/plain; charset="UTF-8"
+
+Hi team,
+
+Please begin onboarding for our new hire:
+
+Given Name: Maria
+Surname: Garcia Lopez
+Preferred Name: Mari
+Personal Email Address: maria.garcia@personal-email.com
+Manager: Carlos Rodriguez
+Position: Sales Development Representative
+Department: Sales
+Employee ID: EMP002
+Start Date: 01/15/2024
+Phone Number: +54-11-5555-0200
+
+Thanks!
+
+--000000000000example2
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">Hi team,<br><br>Please begin onboarding for our new hire:<br><br>Given Name: Maria<br>Surname: Garcia Lopez<br>Preferred Name: Mari<br>Personal Email Address: <a href="mailto:maria.garcia@personal-email.com">maria.garcia@personal-email.com</a><br>Manager: Carlos Rodriguez<br>Position: Sales Development Representative<br>Department: Sales<br>Employee ID: EMP002<br>Start Date: 01/15/2024<br>Phone Number: +54-11-5555-0200<br><br>Thanks!</div>
+
+--000000000000example2--

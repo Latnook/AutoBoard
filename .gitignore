@@ -51,3 +51,12 @@ nul
 
 # n8n workflow location (environment-specific)
 n8n-workflow-location.txt
+
+# Test data with PII (only commit .eml.example templates)
+*.eml
+n8n-migration/*.eml
+
+# Temporary documentation files (now consolidated in docs/)
+n8n-cloud-setup.md
+n8n-email-integration.md
+n8n-redis-rate-limiting.md

@@ -11,24 +11,24 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -1040,
-        -16
+        -960,
+        -320
       ],
-      "id": "ddec3613-e384-4e07-b1ce-4abe33d064dd",
+      "id": "03801c10-31a8-42d4-8df6-31eaf371627b",
       "name": "Webhook - Receive employee details",
       "webhookId": "fe81b475-a414-44ea-aece-6d2b58c41caf"
     },
     {
       "parameters": {
-        "jsCode": "// Get results from previous nodes\nconst google = $('Google - Create User').first().json;\nconst microsoft = $('Microsoft - Create User').first().json;\nconst license = $('Assign License').first().json;\n\n// Get the specific password that was generated in the \"Set User Data\" step\nconst userData = $('Set User Data').first().json;\nconst generatedPassword = userData.temporaryPassword;\n\n// Helper to clean up messages (Same as before)\nconst getErrorMessage = (nodeJson, serviceName) => {\n  if (!nodeJson.error) return null;\n  const rawError = JSON.stringify(nodeJson.error).toLowerCase();\n  \n  if (rawError.includes('entity already exists') || \n      rawError.includes('userprincipalname already exists') || \n      rawError.includes('duplicate')) {\n    return `${serviceName}: User already exists (Skipped creation)`;\n  }\n  if (rawError.includes('password') && (rawError.includes('complexity') || rawError.includes('policy'))) {\n    return `${serviceName}: Password does not meet complexity requirements`;\n  }\n  if (rawError.includes('subscribedskus') || rawError.includes('license')) {\n    return `${serviceName}: No available licenses found`;\n  }\n  return `${serviceName} Error: ${nodeJson.error.message || 'Unknown error'}`;\n};\n\n// Build the final status report\nconst statusReport = {\n  user: userData.email,\n  // --- THIS IS THE NEW LINE ---\n  generatedPassword: generatedPassword, \n  // ----------------------------\n  success: !google.error && !microsoft.error,\n  googleStatus: google.error ? \"Failed\" : \"Created\",\n  microsoftStatus: microsoft.error ? \"Failed\" : \"Created\",\n  messages: []\n};\n\n// Push clean error messages\nif (google.error) statusReport.messages.push(getErrorMessage(google, 'Google'));\nif (microsoft.error) statusReport.messages.push(getErrorMessage(microsoft, 'Microsoft'));\nif (license && license.error) statusReport.messages.push(getErrorMessage(license, 'Licensing'));\n\nreturn statusReport;"
+        "jsCode": "// Get results from previous nodes\n\n  // Check if parsing failed\n  const setUserData = $('Set User Data').first();\n  if (!setUserData || !setUserData.json || !setUserData.json.email) {\n    // Parsing failed - return minimal error report\n    return {\n      user: 'PARSING_FAILED',\n      generatedPassword: 'N/A',\n      success: false,\n      googleStatus: 'Not Attempted',\n      microsoftStatus: 'Not Attempted',\n      messages: ['Email parsing failed - could not extract user data from email'],\n      rateLimit: null\n    };\n  }\n\n    const google = $('Google - Create User').first().json;\n    const microsoft = $('Microsoft - Create User').first().json;\n    const license = $('Assign License').first().json;\n\n  // Get the specific password that was generated in the \"Set User Data\" step\n  const userData = $('Set User Data').first().json;\n  const generatedPassword = userData.temporaryPassword;\n\n  // Get rate limit status from Redis (NEW - using the Redis node)\n  const redisNode = $('Get remaining requests');\n  let rateLimitInfo = null;\n\n  if (redisNode && redisNode.first().json) {\n    try {\n      // Redis Get returns: { \"ratelimit:global\": \"{...}\" }\n      const redisValue = redisNode.first().json['ratelimit:global'];\n\n      if (redisValue && redisValue !== '') {\n        const redisData = JSON.parse(redisValue);\n        const now = Date.now();\n        const remaining = Math.max(0, 10 - redisData.count); // 10 is MAX_REQUESTS_PER_HOUR\n        const resetInMinutes = Math.ceil((redisData.resetAt - now) / 1000 / 60);\n\n        rateLimitInfo = {\n          remaining: remaining,\n          limit: 10,\n          resetInMinutes: resetInMinutes,\n          resetAt: new Date(redisData.resetAt).toISOString()\n        };\n      } // ← Added this closing brace for the \"if (redisValue...\" block\n    } catch (e) {\n      // If parsing fails, set default\n      rateLimitInfo = {\n        remaining: 10,\n        limit: 10,\n        resetInMinutes: 60,\n        resetAt: new Date(Date.now() + 3600000).toISOString()\n      };\n    }\n  }\n\n  // Helper to clean up messages (Same as before)\n  const getErrorMessage = (nodeJson, serviceName) => {\n    if (!nodeJson.error) return null;\n    const rawError = JSON.stringify(nodeJson.error).toLowerCase();\n\n    if (rawError.includes('entity already exists') ||\n        rawError.includes('userprincipalname already exists') ||\n        rawError.includes('duplicate')) {\n      return `${serviceName}: User already exists (Skipped creation)`;\n    }\n    if (rawError.includes('password') && (rawError.includes('complexity') || rawError.includes('policy'))) {\n      return `${serviceName}: Password does not meet complexity requirements`;\n    }\n    if (rawError.includes('subscribedskus') || rawError.includes('license')) {\n      return `${serviceName}: No available licenses found`;\n    }\n    return `${serviceName} Error: ${nodeJson.error.message || 'Unknown error'}`;\n  };\n\n  // Build the final status report\n  const statusReport = {\n    user: userData.email,\n    generatedPassword: generatedPassword,\n    success: !google.error && !microsoft.error,\n    googleStatus: google.error ? \"Failed\" : \"Created\",\n    microsoftStatus: microsoft.error ? \"Failed\" : \"Created\",\n    messages: [],\n    // Add rate limit info with user-friendly message\n    rateLimit: rateLimitInfo ? {\n      remaining: rateLimitInfo.remaining,\n      limit: rateLimitInfo.limit,\n      message: `${rateLimitInfo.remaining} of ${rateLimitInfo.limit} requests remaining. Resets in\n  ${rateLimitInfo.resetInMinutes} minutes.`,\n      resetAt: rateLimitInfo.resetAt,\n      resetInMinutes: rateLimitInfo.resetInMinutes\n    } : null\n  };\n\n  // Push clean error messages\n  if (google.error) statusReport.messages.push(getErrorMessage(google, 'Google'));\n  if (microsoft.error) statusReport.messages.push(getErrorMessage(microsoft, 'Microsoft'));\n  if (license && license.error) statusReport.messages.push(getErrorMessage(license, 'Licensing'));\n\n  return statusReport;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        976,
-        16
+        768,
+        -32
       ],
-      "id": "c83f1107-c006-45a6-b459-100677d1cd54",
+      "id": "35e7e67c-55f7-4d1a-9ae6-20e5b573138f",
       "name": "Merge results",
       "onError": "continueRegularOutput"
     },
@@ -39,45 +39,11 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        1200,
-        -112
+        1216,
+        -96
       ],
-      "id": "c19d5245-9f2f-42d2-af00-2a40fd38421a",
+      "id": "1bd9cdcf-7782-4665-8783-d81e3e5f3922",
       "name": "Respond to Webhook"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "0ea54209-6374-45e7-9866-d961c3b971c2",
-              "leftValue": "={{ $node[\"Set User Data\"].json.assignLicense }}",
-              "rightValue": "=true",
-              "operator": {
-                "type": "string",
-                "operation": "equals",
-                "name": "filter.operator.equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        -144,
-        96
-      ],
-      "id": "56e72fb8-269f-4732-bc72-6f2c85d2d01c",
-      "name": "If"
     },
     {
       "parameters": {
@@ -89,18 +55,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        80,
-        16
+        -512,
+        336
       ],
-      "id": "b9fa7bef-c1d7-4b37-8db0-57ec770ae2ad",
+      "id": "b521abc1-6930-4b59-a4b7-f2f6fcc0d0c5",
       "name": "Get Available SKUs",
       "credentials": {
-        "microsoftEntraOAuth2Api": {
-          "id": "SWKC2SlWjX21j3KS",
-          "name": "Microsoft Entra ID (Azure Active Directory) account"
-        },
         "microsoftGraphSecurityOAuth2Api": {
-          "id": "2PO9y1vAwo9O1Wm0",
+          "id": "8aJhP1AZCyqyHz0a",
           "name": "Microsoft Graph Security account"
         }
       },
@@ -120,14 +82,14 @@
       "type": "n8n-nodes-base.gSuiteAdmin",
       "typeVersion": 1,
       "position": [
-        528,
-        -176
+        -960,
+        160
       ],
-      "id": "575ff232-e3dd-4274-98f0-63ad6c1f7942",
+      "id": "c73f0be9-959c-4a5e-a0d9-cb7a7f50a4fa",
       "name": "Google - Create User",
       "credentials": {
         "gSuiteAdminOAuth2Api": {
-          "id": "I7S0X99Sf6VULYJ8",
+          "id": "y4s1J3XqOssOBEbE",
           "name": "Google Workspace Admin account"
         }
       },
@@ -204,24 +166,23 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -816,
-        -16
+        -960,
+        -96
       ],
-      "id": "cbe274db-701c-42d5-9839-1566cc929976",
+      "id": "a0225cf9-283d-4f3c-a11d-553aaaf1cb64",
       "name": "Set User Data"
     },
     {
-      "parameters": {
-        "numberInputs": 3
-      },
+      "parameters": {},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        752,
-        0
+        400,
+        208
       ],
-      "id": "d52fa8d0-bcee-444c-9e5c-4e064ba8cbec",
-      "name": "Wait for All Branches"
+      "id": "de7cdb3d-f405-45ea-ac5a-393056799050",
+      "name": "Wait for All Branches",
+      "executeOnce": true
     },
     {
       "parameters": {
@@ -230,10 +191,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        304,
-        16
+        -272,
+        336
       ],
-      "id": "f3194f7c-efc6-414b-a7ba-c317fb32d95e",
+      "id": "1d9c5d8a-6806-4336-884a-df09a3b39ba4",
       "name": "Resolve SKU ID",
       "onError": "continueRegularOutput"
     },
@@ -251,14 +212,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        528,
-        16
+        -80,
+        336
       ],
-      "id": "b4405121-a821-42a9-aa77-ea8d8bef012e",
+      "id": "00b69956-fcda-449d-bc01-60878302978e",
       "name": "Assign License",
       "credentials": {
         "microsoftGraphSecurityOAuth2Api": {
-          "id": "2PO9y1vAwo9O1Wm0",
+          "id": "8aJhP1AZCyqyHz0a",
           "name": "Microsoft Graph Security account"
         }
       },
@@ -278,14 +239,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -368,
-        96
+        -960,
+        352
       ],
-      "id": "e915bfdb-4fec-45a0-ad1d-0d8d8c4006bd",
+      "id": "185e6947-b31a-411a-91b3-a6b19c3752ff",
       "name": "Microsoft - Create User",
       "credentials": {
         "microsoftGraphSecurityOAuth2Api": {
-          "id": "2PO9y1vAwo9O1Wm0",
+          "id": "8aJhP1AZCyqyHz0a",
           "name": "Microsoft Graph Security account"
         }
       },
@@ -293,76 +254,651 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://localhost:3000/api/rate-limit/check",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
             {
-              "name": "X-API-Key",
-              "value": "your-api-key-here"
+              "id": "fb522284-a369-4a69-9b1c-502f27c1465e",
+              "leftValue": "={{ $('Set User Data').first().json.usageLocation }}",
+              "rightValue": "IL",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
             }
-          ]
+          ],
+          "combinator": "and"
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        -592,
-        -16
+        -80,
+        144
       ],
-      "id": "86c0183c-dc1f-4a1f-ba48-93b4c763cce0",
-      "name": "Check Rate Limit",
-      "onError": "continueRegularOutput"
+      "id": "b706b42f-5e59-49b8-a008-677c3f5a0f50",
+      "name": "Israel?"
     },
     {
       "parameters": {
+        "operation": "addToGroup",
+        "userId": {
+          "__rl": true,
+          "value": "={{ $('Set User Data').first().json.email }}",
+          "mode": "userEmail"
+        },
+        "groupId": {
+          "__rl": true,
+          "value": "02ce457m3w0t6md",
+          "mode": "list",
+          "cachedResultName": "Company Location"
+        }
+      },
+      "type": "n8n-nodes-base.gSuiteAdmin",
+      "typeVersion": 1,
+      "position": [
+        160,
+        128
+      ],
+      "id": "8d46ec38-122c-4bd5-a198-68442155b84d",
+      "name": "Add to IL",
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "y4s1J3XqOssOBEbE",
+          "name": "Google Workspace Admin account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "q": "subject:(New Hire Onboarding:)",
+          "sender": "hr@company.com"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -960,
+        -512
+      ],
+      "id": "453ee6ff-fb67-4159-9ddc-92966e371fb1",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a5Y85UkfCHr6gzz5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n  // ===== CONFIGURATION =====\n  const MAX_REQUESTS_PER_HOUR = 10;\n  const WINDOW_MS = 60 * 60 * 1000; // 1 hour in milliseconds\n\n  // ===== GET CURRENT RATE LIMIT FROM REDIS =====\n  const redisNode = $('Get Rate Limit from Upstash');\n  let currentCount = 0;\n  let resetAt = null;\n\n  // Parse existing data from Redis (if exists)\n  if (redisNode && redisNode.first().json) {\n    try {\n      // Redis Get returns: { \"ratelimit:global\": \"{...}\" }\n      const redisValue = redisNode.first().json['ratelimit:global'];\n\n      if (redisValue && redisValue !== '') {\n        const redisData = JSON.parse(redisValue);\n        currentCount = redisData.count || 0;\n        resetAt = redisData.resetAt;\n      }\n    } catch (e) {\n      // Redis returned empty or invalid - treat as first request\n      console.log('Error parsing Redis data:', e.message);\n      currentCount = 0;\n      resetAt = null;\n    }\n  }\n\n  const now = Date.now();\n\n  // ===== CHECK IF WINDOW EXPIRED =====\n  if (!resetAt || now > resetAt) {\n    // Start new window\n    currentCount = 1;\n    resetAt = now + WINDOW_MS;\n  } else {\n    // Increment existing window\n    currentCount++;\n  }\n\n  // ===== CHECK LIMIT =====\n  const allowed = currentCount <= MAX_REQUESTS_PER_HOUR;\n  const remaining = Math.max(0, MAX_REQUESTS_PER_HOUR - currentCount);\n  const resetInMinutes = Math.ceil((resetAt - now) / 1000 / 60);\n  const resetInSeconds = Math.ceil((resetAt - now) / 1000);\n\n  // ===== RETURN RESULT =====\n  return [{\n    json: {\n      allowed: allowed,\n      count: currentCount,\n      limit: MAX_REQUESTS_PER_HOUR,\n      remaining: remaining,\n      resetAt: resetAt,\n      resetInMinutes: resetInMinutes,\n      resetInSeconds: resetInSeconds,\n      // This will be saved back to Redis\n      redisValue: JSON.stringify({\n        count: currentCount,\n        resetAt: resetAt\n      })\n    }\n  }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        -96
+      ],
+      "id": "82fdbff8-bd75-4793-b813-a4110bb5a442",
+      "name": "Check & Update Rate Limit"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"Rate limit exceeded\",\n  \"message\": \"You can only create {{ $('Check & Update Rate Limit').item.json.limit }} users per hour. You have made {{ $('Check & Update Rate Limit').item.json.count }} requests. Please try again in {{ $('Check & Update Rate Limit').item.json.resetInMinutes }} minutes.\",\n  \"limit\": \"{{ $('Check & Update Rate Limit').item.json.limit }}\",\n  \"remaining\": 0,\n  \"retryAfter\": \"{{ $('Check & Update Rate Limit').item.json.resetInSeconds }}\"\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.4,
+      "typeVersion": 1.5,
       "position": [
-        -1040,
-        320
+        288,
+        -272
       ],
-      "id": "bc47e6e1-fdcc-4e32-95c1-8f2116309e0c",
-      "name": "Rate limit reached"
+      "id": "14bb4c87-0fa5-4723-bc05-44fe76a4df96",
+      "name": "No requests left"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://localhost:3000/api/rate-limit/check",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
             {
-              "name": "X-API-Key",
-              "value": "your-api-key-here"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
+              "id": "3a216515-3f0d-43cb-a0bc-e6e34ac0acbe",
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
-          ]
+          ],
+          "combinator": "and"
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n    \"action\": \"USER_CREATED\",\n    \"targetEmail\": \"{{ $('Set User Data').first().json.email }}\",\n    \"performedBy\": \"n8n-workflow\",\n    \"success\": \"{{ $('Merge results').first().json.success }}\",\n    \"details\": {\n      \"googleCreated\": \"{{ $('Merge results').first().json.results.google !== null }}\",\n      \"microsoftCreated\": \"{{ $('Merge results').first().json.results.microsoft !== null }}\",\n      \"licenseAssigned\": \"{{ $('Merge results').first().json.results.microsoft?.licenseAssigned }}\"\n    }\n  }",
         "options": {}
       },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        1200,
-        96
+        -288,
+        -96
       ],
-      "id": "c1ecd762-729f-4cdc-ad9a-10d2a338e04f",
-      "name": "Log Audit",
+      "id": "7410e958-6116-4477-9da8-f0c2aa728109",
+      "name": "Are there requests left?"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "ratelimit:global",
+        "value": "={{ $('Check & Update Rate Limit').item.json.redisValue }}",
+        "keyType": "string",
+        "expire": true,
+        "ttl": 3600
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -112
+      ],
+      "id": "5358d3d5-c354-4493-982e-9f4ea09ef756",
+      "name": "Update count",
+      "credentials": {
+        "redis": {
+          "id": "pWxxTpYinE19CzhY",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "ratelimit:global",
+        "key": "ratelimit:global",
+        "keyType": "string",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        544,
+        -32
+      ],
+      "id": "223ff5ec-8d19-48f7-ae7e-1eef97e5b6f0",
+      "name": "Get remaining requests",
+      "credentials": {
+        "redis": {
+          "id": "pWxxTpYinE19CzhY",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "12daQhNDyacTs3CDr74Tsi66Tp8eoJJvI8ged-zfmEvU",
+          "mode": "list",
+          "cachedResultName": "AutoBoard Audit Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12daQhNDyacTs3CDr74Tsi66Tp8eoJJvI8ged-zfmEvU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/12daQhNDyacTs3CDr74Tsi66Tp8eoJJvI8ged-zfmEvU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "User Email": "={{ $('Merge results').first().json.user }}",
+            "Success": "={{ $('Merge results').first().json.success }}",
+            "Google Status": "={{ $('Merge results').first().json.googleStatus }}",
+            "Microsoft Status": "={{ $('Merge results').first().json.microsoftStatus }}",
+            "License Assigned": "={{ $('Assign License').first().json ? 'Yes' : 'No' }}",
+            "Temporary Password": "={{ $('Merge results').first().json.generatedPassword }}",
+            "Error Messages": "={{ $('Merge results').first().json.messages.join('; ') }}",
+            "Triggered By": "={{ $('Set User Data').first().json._emailTrigger ? 'Email' : 'Webhook' }}"
+          },
+          "matchingColumns": [
+            "Timestamp"
+          ],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "User Email",
+              "displayName": "User Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Success",
+              "displayName": "Success",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Google Status",
+              "displayName": "Google Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Microsoft Status",
+              "displayName": "Microsoft Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "License Assigned",
+              "displayName": "License Assigned",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Temporary Password",
+              "displayName": "Temporary Password",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Error Messages",
+              "displayName": "Error Messages",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Triggered By",
+              "displayName": "Triggered By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        -272
+      ],
+      "id": "ab3df5b2-8f98-49b2-ad34-29e7f6a74ea7",
+      "name": "Append or update row in sheet",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "SOl7gmDDmQkOXcso",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get email data from Gmail Trigger\n  const emailData = $input.first().json;\n\n  // Gmail Trigger returns capitalized field names\n  const emailBodyHtml = emailData.html || emailData.Html || '';\n  const emailBodyText = emailData.text || emailData.textPlain || emailData.Text || emailData.TextPlain ||\n  emailData.snippet || emailData.Snippet || '';\n  const emailSubject = emailData.subject || emailData.Subject || '';\n  const senderEmail = emailData.from || emailData.From || '';\n\n  // Extract from subject line - handle multiple formats\n  let position = '';\n  let country = '';\n  let fullName = '';\n\n  // Try format: Part1 - Part2 - Part3 (e.g., \"SDR - Maria Belén - Argentina\")\n  let subjectMatch = emailSubject.match(/New Hire Onboarding:\\s*(.+?)\\s*-\\s*(.+?)\\s*-\\s*(.+)/i);\n  if (subjectMatch) {\n    fullName = subjectMatch[1].trim();\n    position = subjectMatch[2].trim();\n    country = subjectMatch[3].trim();\n  } else {\n    // Try format: Name - Position, Country (e.g., \"John Doe - Manager, US\")\n    subjectMatch = emailSubject.match(/New Hire Onboarding:\\s*(.+?)\\s*-\\s*(.+)/i);\n    if (subjectMatch) {\n      fullName = subjectMatch[1].trim();\n      const posCountry = subjectMatch[2].trim();\n      // Try to split by comma\n      const parts = posCountry.split(',').map(p => p.trim());\n      if (parts.length >= 2) {\n        position = parts[0];\n        country = parts[parts.length - 1]; // Last part is country\n      } else {\n        position = posCountry;\n      }\n    }\n  }\n\n  // Helper: Extract text after a label\n  function extractField(text, label) {\n    const regex = new RegExp(label + '[:\\\\s]+([^\\\\n\\\\r]+)', 'i');\n    const match = text.match(regex);\n    return match ? match[1].trim() : null;\n  }\n\n  // === NEW FORMAT: Try extracting separate Given Name and Surname first ===\n  let givenName = extractField(emailBodyText, 'Given Name');\n  let surname = extractField(emailBodyText, 'Surname');\n\n  // === FALLBACK TO OLD FORMAT: Parse Full Legal Name if separate fields not found ===\n  if (!givenName || !surname) {\n    // Try to extract from email body\n    const bodyFullName = extractField(emailBodyText, 'Full Legal Name');\n    const nameToSplit = bodyFullName || fullName;\n\n    if (nameToSplit) {\n      const nameParts = nameToSplit.trim().split(/\\s+/);\n\n      // Extract given name (first word)\n      givenName = nameParts[0];\n\n      // Extract surname with Hebrew patronymic support\n      if (nameParts.length > 1) {\n        // Check if second-to-last word is \"Ben\" or \"Bat\" (Hebrew patronymic)\n        if (nameParts.length >= 3) {\n          const secondToLast = nameParts[nameParts.length - 2].toLowerCase();\n          if (secondToLast === 'ben' || secondToLast === 'bat') {\n            // Include \"Ben/Bat [LastName]\" as the surname\n            surname = nameParts.slice(-2).join(' ');\n          } else {\n            // Just use the last word\n            surname = nameParts[nameParts.length - 1];\n          }\n        } else {\n          // Only 2 words, use last word\n          surname = nameParts[nameParts.length - 1];\n        }\n      } else {\n        surname = '';\n      }\n    }\n  }\n\n  // === PREFERRED NAME (works with both formats) ===\n  let preferredName = extractField(emailBodyText, 'Preferred Name');\n\n  // === OTHER FIELDS ===\n  let personalEmail = extractField(emailBodyText, 'Personal Email Address');\n  let manager = extractField(emailBodyText, 'Manager');\n\n  // Extract position from body if available (overrides subject)\n  const bodyPosition = extractField(emailBodyText, 'Position');\n  if (bodyPosition) position = bodyPosition;\n\n  // Extract email from HTML if needed\n  if (!personalEmail && emailBodyHtml) {\n    const emails = emailBodyHtml.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9_-]+)/g);\n    if (emails) {\n      for (let email of emails) {\n        if (!email.includes('@company.com')) {\n          personalEmail = email;\n          break;\n        }\n      }\n    }\n  }\n\n  // === NAME LOGIC: Preferred name takes precedence ===\n  let firstName = '';\n  let lastName = '';\n\n  if (preferredName && preferredName.trim() !== '') {\n    firstName = preferredName.trim();\n  } else {\n    firstName = givenName || '';\n  }\n\n  lastName = surname || '';\n\n  // Normalize for email: remove accents, lowercase, special chars\n  const normalize = (str) => str.toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z]/g, '');\n\n  const firstNameNorm = normalize(firstName);\n  const lastNameNorm = normalize(lastName);\n  const lastInitial = lastNameNorm.charAt(0) || '';\n\n  // Generate emails\n  const primaryEmail = `${firstNameNorm}@company.com`;\n  const alternativeEmail = lastInitial ? `${firstNameNorm}.${lastInitial}@company.com` : null;\n\n  // Department mapping\n  let department = 'General';\n  if (position.toLowerCase().includes('sdr') || position.toLowerCase().includes('sales')) {\n    department = 'Sales';\n  } else if (position.toLowerCase().includes('engineer') || position.toLowerCase().includes('dev')) {\n    department = 'Engineering';\n  }\n\n  // Country to location code - comprehensive mapping for all countries\n  let usageLocation = 'US'; // Default fallback to Israel\n\n  if (country) {\n    const countryLower = country.toLowerCase().trim();\n\n    // If it's 2 characters, assume it's already a country code\n    if (countryLower.length === 2) {\n      usageLocation = countryLower.toUpperCase();\n    } else {\n      // Comprehensive country name to ISO code mapping\n      const countryNameMap = {\n        // Americas\n        'argentina': 'AR',\n        'bolivia': 'BO',\n        'brazil': 'BR',\n        'canada': 'CA',\n        'chile': 'CL',\n        'colombia': 'CO',\n        'costa rica': 'CR',\n        'cuba': 'CU',\n        'dominican republic': 'DO',\n        'ecuador': 'EC',\n        'el salvador': 'SV',\n        'guatemala': 'GT',\n        'haiti': 'HT',\n        'honduras': 'HN',\n        'jamaica': 'JM',\n        'mexico': 'MX',\n        'nicaragua': 'NI',\n        'panama': 'PA',\n        'paraguay': 'PY',\n        'peru': 'PE',\n        'puerto rico': 'PR',\n        'trinidad and tobago': 'TT',\n        'uruguay': 'UY',\n        'venezuela': 'VE',\n        'usa': 'US',\n        'united states': 'US',\n        'united states of america': 'US',\n\n        // Europe\n        'albania': 'AL',\n        'andorra': 'AD',\n        'armenia': 'AM',\n        'austria': 'AT',\n        'azerbaijan': 'AZ',\n        'belarus': 'BY',\n        'belgium': 'BE',\n        'bosnia and herzegovina': 'BA',\n        'bulgaria': 'BG',\n        'croatia': 'HR',\n        'cyprus': 'CY',\n        'czech republic': 'CZ',\n        'czechia': 'CZ',\n        'denmark': 'DK',\n        'estonia': 'EE',\n        'finland': 'FI',\n        'france': 'FR',\n        'georgia': 'GE',\n        'germany': 'DE',\n        'greece': 'GR',\n        'hungary': 'HU',\n        'iceland': 'IS',\n        'ireland': 'IE',\n        'italy': 'IT',\n        'kosovo': 'XK',\n        'latvia': 'LV',\n        'liechtenstein': 'LI',\n        'lithuania': 'LT',\n        'luxembourg': 'LU',\n        'malta': 'MT',\n        'moldova': 'MD',\n        'monaco': 'MC',\n        'montenegro': 'ME',\n        'netherlands': 'NL',\n        'north macedonia': 'MK',\n        'macedonia': 'MK',\n        'norway': 'NO',\n        'poland': 'PL',\n        'portugal': 'PT',\n        'romania': 'RO',\n        'russia': 'RU',\n        'russian federation': 'RU',\n        'san marino': 'SM',\n        'serbia': 'RS',\n        'slovakia': 'SK',\n        'slovenia': 'SI',\n        'spain': 'ES',\n        'sweden': 'SE',\n        'switzerland': 'CH',\n        'turkey': 'TR',\n        'ukraine': 'UA',\n        'united kingdom': 'GB',\n        'uk': 'GB',\n        'great britain': 'GB',\n        'england': 'GB',\n        'scotland': 'GB',\n        'wales': 'GB',\n        'northern ireland': 'GB',\n        'vatican city': 'VA',\n\n        // Middle East\n        'afghanistan': 'AF',\n        'bahrain': 'BH',\n        'egypt': 'EG',\n        'iran': 'IR',\n        'iraq': 'IQ',\n        'israel': 'IL',\n        'jordan': 'JO',\n        'kuwait': 'KW',\n        'lebanon': 'LB',\n        'oman': 'OM',\n        'palestine': 'PS',\n        'qatar': 'QA',\n        'saudi arabia': 'SA',\n        'syria': 'SY',\n        'united arab emirates': 'AE',\n        'uae': 'AE',\n        'yemen': 'YE',\n\n        // Asia\n        'bangladesh': 'BD',\n        'bhutan': 'BT',\n        'brunei': 'BN',\n        'cambodia': 'KH',\n        'china': 'CN',\n        'hong kong': 'HK',\n        'india': 'IN',\n        'indonesia': 'ID',\n        'japan': 'JP',\n        'kazakhstan': 'KZ',\n        'kyrgyzstan': 'KG',\n        'laos': 'LA',\n        'macao': 'MO',\n        'macau': 'MO',\n        'malaysia': 'MY',\n        'maldives': 'MV',\n        'mongolia': 'MN',\n        'myanmar': 'MM',\n        'burma': 'MM',\n        'nepal': 'NP',\n        'north korea': 'KP',\n        'pakistan': 'PK',\n        'philippines': 'PH',\n        'singapore': 'SG',\n        'south korea': 'KR',\n        'korea': 'KR',\n        'sri lanka': 'LK',\n        'taiwan': 'TW',\n        'tajikistan': 'TJ',\n        'thailand': 'TH',\n        'timor-leste': 'TL',\n        'east timor': 'TL',\n        'turkmenistan': 'TM',\n        'uzbekistan': 'UZ',\n        'vietnam': 'VN',\n\n        // Africa\n        'algeria': 'DZ',\n        'angola': 'AO',\n        'benin': 'BJ',\n        'botswana': 'BW',\n        'burkina faso': 'BF',\n        'burundi': 'BI',\n        'cameroon': 'CM',\n        'cape verde': 'CV',\n        'central african republic': 'CF',\n        'chad': 'TD',\n        'comoros': 'KM',\n        'congo': 'CG',\n        'democratic republic of the congo': 'CD',\n        'drc': 'CD',\n        'djibouti': 'DJ',\n        'equatorial guinea': 'GQ',\n        'eritrea': 'ER',\n        'ethiopia': 'ET',\n        'gabon': 'GA',\n        'gambia': 'GM',\n        'ghana': 'GH',\n        'guinea': 'GN',\n        'guinea-bissau': 'GW',\n        'ivory coast': 'CI',\n        'cote d\\'ivoire': 'CI',\n        'kenya': 'KE',\n        'lesotho': 'LS',\n        'liberia': 'LR',\n        'libya': 'LY',\n        'madagascar': 'MG',\n        'malawi': 'MW',\n        'mali': 'ML',\n        'mauritania': 'MR',\n        'mauritius': 'MU',\n        'morocco': 'MA',\n        'mozambique': 'MZ',\n        'namibia': 'NA',\n        'niger': 'NE',\n        'nigeria': 'NG',\n        'rwanda': 'RW',\n        'sao tome and principe': 'ST',\n        'senegal': 'SN',\n        'seychelles': 'SC',\n        'sierra leone': 'SL',\n        'somalia': 'SO',\n        'south africa': 'ZA',\n        'south sudan': 'SS',\n        'sudan': 'SD',\n        'tanzania': 'TZ',\n        'togo': 'TG',\n        'tunisia': 'TN',\n        'uganda': 'UG',\n        'zambia': 'ZM',\n        'zimbabwe': 'ZW',\n\n        // Oceania\n        'australia': 'AU',\n        'fiji': 'FJ',\n        'kiribati': 'KI',\n        'marshall islands': 'MH',\n        'micronesia': 'FM',\n        'nauru': 'NR',\n        'new zealand': 'NZ',\n        'palau': 'PW',\n        'papua new guinea': 'PG',\n        'samoa': 'WS',\n        'solomon islands': 'SB',\n        'tonga': 'TO',\n        'tuvalu': 'TV',\n        'vanuatu': 'VU'\n      };\n\n      usageLocation = countryNameMap[countryLower] || 'US';\n    }\n  }\n\n  // Generate password\n  const password = 'Temp' + Math.random().toString(36).slice(-8) + '!A1';\n\n  if (!firstName) {\n    throw new Error(`Could not extract name. Given: ${givenName}, Surname: ${surname}, Full: ${fullName}, Preferred:\n   ${preferredName}`);\n  }\n\n  return [{\n    json: {\n      fullName: fullName || `${givenName} ${surname}`,\n      firstName,\n      lastName,\n      personalEmail,\n      manager,\n      position: position || 'Employee',\n      department,\n      usageLocation,\n      country,\n      primaryEmail,\n      lastInitial,\n      alternativeEmail,\n      password,\n      _emailTrigger: true,\n      _senderEmail: senderEmail,\n      _originalSubject: emailSubject,\n      _preferredName: preferredName || firstName,\n      _givenName: givenName,\n      _surname: surname\n    }\n  }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        -512
+      ],
+      "id": "b4a8dce9-e92b-4a0d-aebd-f86512aae40e",
+      "name": "Parse HR Email",
+      "notesInFlow": false,
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse HR Email').first().json;\n  const checkResult = $('Check if Email Exists').first().json;\n\n  let finalEmail = parsed.primaryEmail;\n  let emailStatus = 'primary';\n\n  // If primary exists, use alternative\n  const primaryExists = checkResult && !checkResult.error && checkResult.primaryEmail;\n  if (primaryExists) {\n    if (parsed.alternativeEmail) {\n      finalEmail = parsed.alternativeEmail;\n      emailStatus = 'alternative';\n    } else {\n      throw new Error(`Email ${parsed.primaryEmail} exists and no last name for alternative. Manual intervention needed for\n   ${parsed.fullName}`);\n    }\n  }\n\n  return [{\n    json: {\n      body: {\n        firstName: parsed.firstName,\n        lastName: parsed.lastName,\n        email: finalEmail,\n        jobTitle: parsed.position,\n        department: parsed.department,\n        usageLocation: parsed.usageLocation,\n        assignLicense: true,\n        password: parsed.password\n      },\n      _emailTrigger: true,\n      _senderEmail: parsed._senderEmail,\n      _originalSubject: parsed._originalSubject,\n      _preferredName: parsed._preferredName,\n      _personalEmail: parsed.personalEmail,\n      _manager: parsed.manager,\n      _position: parsed.position,\n      _fullName: parsed.fullName,\n      _emailStatus: emailStatus,\n      _primaryEmailTried: parsed.primaryEmail\n    }\n  }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -336,
+        -512
+      ],
+      "id": "717483c8-dfc3-46b2-ac9e-8054440b7083",
+      "name": "Generate a unique email",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "userId": {
+          "__rl": true,
+          "value": "={{ $json.primaryEmail }}",
+          "mode": "userId"
+        }
+      },
+      "type": "n8n-nodes-base.gSuiteAdmin",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        -512
+      ],
+      "id": "8eb0d6df-ef0f-43d3-946e-7f3a6af7ffa7",
+      "name": "Check if Email Exists",
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "y4s1J3XqOssOBEbE",
+          "name": "Google Workspace Admin account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "hr@company.com",
+        "subject": "=Autoboard - {{ $('Set User Data').first().json.email }} - {{ $('Merge results').first().json.success ? 'Success' :   'Partial Failure' }}",
+        "message": "=<h2>AutoBoard User Creation Report</h2>\n\n  <p><strong>User Email:</strong> {{ $('Set User Data').first().json.email }}</p>\n  <p><strong>Full Name:</strong> {{ $('Set User Data').first().json.displayName }}</p>\n  <p><strong>Job Title:</strong> {{ $('Set User Data').first().json.jobTitle }}</p>\n  <p><strong>Department:</strong> {{ $('Set User Data').first().json.department }}</p>\n  <p><strong>Location:</strong> {{ $('Set User Data').first().json.usageLocation }}</p>\n\n  <h3>Account Status</h3>\n  <ul>\n    <li><strong>Google Workspace:</strong> {{ $('Merge results').first().json.googleStatus }}</li>\n    <li><strong>Microsoft 365:</strong> {{ $('Merge results').first().json.microsoftStatus }}</li>\n    <li><strong>Overall Success:</strong> {{ $('Merge results').first().json.success ? '✅ Yes' : '❌ No' }}</li>\n  </ul>\n\n  <h3>Credentials</h3>\n  <p><strong>Temporary Password:</strong> <code>{{ $('Merge results').first().json.generatedPassword }}</code></p>\n  <p><em>User must change password on first login</em></p>\n\n  <h3>Messages</h3>\n  <p>{{ $('Merge results').first().json.messages.join('; ') || 'None' }}</p>\n\n  <h3>Rate Limit Status</h3>\n  <p>{{ $('Merge results').first().json.rateLimit.message || 'No rate limit info available' }}</p>\n\n  <hr>\n  <p><small>Triggered by: {{ $('Set User Data').first().json._emailTrigger ? 'Email' : 'Webhook' }}</small></p>\n  <p><small>Timestamp: {{ new Date().toISOString() }}</small></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1216,
+        48
+      ],
+      "id": "1bb4bf8a-f560-4346-9134-36c698846542",
+      "name": "Send a message",
+      "webhookId": "7ececca1-fe06-47e0-a923-097653e17d36",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a5Y85UkfCHr6gzz5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0ea54209-6374-45e7-9866-d961c3b971c2",
+              "leftValue": "={{ $node[\"Set User Data\"].json.assignLicense }}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -736,
+        352
+      ],
+      "id": "b4d511b8-0898-4a6c-be93-ec8626708993",
+      "name": "License"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get rate limit info from the check node\n  const rateLimitData = $('Check & Update Rate Limit').first().json;\n  const userData = $('Set User Data').first().json;\n\n  // Return data in the same format as \"Merge results\" so Google Sheets can process it\n  return {\n    user: userData?.email || 'RATE_LIMIT_EXCEEDED',\n    generatedPassword: 'N/A',\n    success: false,\n    googleStatus: 'Not Attempted',\n    microsoftStatus: 'Not Attempted',\n    messages: [`Rate limit exceeded: ${rateLimitData.count}/${rateLimitData.limit} requests used. Resets in ${rateLimitData.resetInMinutes}\n  minutes.`],\n    rateLimit: {\n      remaining: 0,\n      limit: rateLimitData.limit,\n      message: `Rate limit exceeded. Resets in ${rateLimitData.resetInMinutes} minutes.`,\n      resetAt: new Date(rateLimitData.resetAt).toISOString(),\n      resetInMinutes: rateLimitData.resetInMinutes\n    }\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -272
+      ],
+      "id": "de5f49ef-c520-4710-ae74-1a92c370629c",
+      "name": "Format Rate Limit Error",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3c523c3f-6a97-4477-800e-0c0117a55204",
+              "leftValue": "={{ $('Set User Data').item.json.department }}",
+              "rightValue": "Production",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -736,
+        160
+      ],
+      "id": "c3833887-6ccd-44dc-90a7-9a2e15fc08be",
+      "name": "Production"
+    },
+    {
+      "parameters": {
+        "operation": "addToGroup",
+        "userId": {
+          "__rl": true,
+          "value": "={{ $('Set User Data').first().json.email }}",
+          "mode": "userId"
+        },
+        "groupId": {
+          "__rl": true,
+          "value": "00pkwqa12fd3qfr",
+          "mode": "list",
+          "cachedResultName": "Production"
+        }
+      },
+      "type": "n8n-nodes-base.gSuiteAdmin",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        144
+      ],
+      "id": "4e1b4be6-71e5-4e02-aa9d-fc42393c6515",
+      "name": "Add user to group",
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "y4s1J3XqOssOBEbE",
+          "name": "Google Workspace Admin account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "ratelimit:global",
+        "key": "ratelimit:global",
+        "keyType": "string",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        -96
+      ],
+      "id": "de75c6e7-60c3-4938-b889-e2c82644f05d",
+      "name": "Get Rate Limit from Upstash",
+      "credentials": {
+        "redis": {
+          "id": "pWxxTpYinE19CzhY",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('Gmail Trigger').first().json.id }}",
+        "message": "=Google and Microsoft:\nUsername: {{ $json.user }}\nPassword: {{ $json.generatedPassword }}\n\nFurther permissions will be given upon request\n\n{{ $json.rateLimit.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1216,
+        208
+      ],
+      "id": "d1b0aa2e-a5be-47ab-95f1-362a02377d6d",
+      "name": "Reply to a message",
+      "webhookId": "4c7d417d-9aee-4bd4-9c92-7546d939a15d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a5Y85UkfCHr6gzz5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7e6293e7-63a3-4a53-8824-5cdaa8256aec",
+              "leftValue": "={{ $('Set User Data').first().json._emailTrigger ? 'Email' : 'Webhook' }}",
+              "rightValue": "Email",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1008,
+        192
+      ],
+      "id": "19f0aaf0-772f-41d5-b8a1-49f880814565",
+      "name": "Triggered by Email"
     }
   ],
-  "pinData": {},
+  "pinData": {
+    "Webhook - Receive employee details": [
+      {
+        "json": {
+          "headers": {
+            "host": "autoboard.company.com",
+            "user-agent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.7462",
+            "content-length": "159",
+            "content-type": "application/json",
+            "expect": "100-continue",
+            "x-forwarded-for": "31.154.75.118",
+            "x-forwarded-host": "autoboard.company.com",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "a0a917927a93",
+            "x-real-ip": "31.154.75.118",
+            "accept-encoding": "gzip"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "firstName": "Test",
+            "lastName": "User",
+            "email": "admin@company.com",
+            "jobTitle": "Executive Assistant",
+            "department": "",
+            "usageLocation": "IL",
+            "assignLicense": true
+          },
+          "webhookUrl": "https://autoboard.company.com/webhook/autoboard-onboard",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
   "connections": {
     "Webhook - Receive employee details": {
       "main": [
@@ -384,27 +920,19 @@
             "index": 0
           },
           {
-            "node": "Log Audit",
+            "node": "Append or update row in sheet",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "If": {
-      "main": [
-        [
+          },
           {
-            "node": "Get Available SKUs",
+            "node": "Send a message",
             "type": "main",
             "index": 0
-          }
-        ],
-        [
+          },
           {
-            "node": "Wait for All Branches",
+            "node": "Triggered by Email",
             "type": "main",
-            "index": 2
+            "index": 0
           }
         ]
       ]
@@ -424,7 +952,7 @@
       "main": [
         [
           {
-            "node": "Wait for All Branches",
+            "node": "Production",
             "type": "main",
             "index": 0
           }
@@ -435,7 +963,7 @@
       "main": [
         [
           {
-            "node": "Check Rate Limit",
+            "node": "Get Rate Limit from Upstash",
             "type": "main",
             "index": 0
           }
@@ -446,7 +974,7 @@
       "main": [
         [
           {
-            "node": "Merge results",
+            "node": "Get remaining requests",
             "type": "main",
             "index": 0
           }
@@ -479,14 +1007,83 @@
       "main": [
         [
           {
-            "node": "If",
+            "node": "License",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check Rate Limit": {
+    "Israel?": {
+      "main": [
+        [
+          {
+            "node": "Add to IL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for All Branches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to IL": {
+      "main": [
+        [
+          {
+            "node": "Wait for All Branches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse HR Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check & Update Rate Limit": {
+      "main": [
+        [
+          {
+            "node": "Are there requests left?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Are there requests left?": {
+      "main": [
+        [
+          {
+            "node": "Update count",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No requests left",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update count": {
       "main": [
         [
           {
@@ -499,28 +1096,163 @@
             "type": "main",
             "index": 0
           }
+        ]
+      ]
+    },
+    "Get remaining requests": {
+      "main": [
+        [
+          {
+            "node": "Merge results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Parse HR Email": {
+      "main": [
+        [
+          {
+            "node": "Check if Email Exists",
+            "type": "main",
+            "index": 0
+          }
         ],
         []
       ]
     },
-    "Log Audit": {
+    "Generate a unique email": {
       "main": [
-        []
+        [
+          {
+            "node": "Set User Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No requests left": {
+      "main": [
+        [
+          {
+            "node": "Format Rate Limit Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Email Exists": {
+      "main": [
+        [
+          {
+            "node": "Generate a unique email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "License": {
+      "main": [
+        [
+          {
+            "node": "Get Available SKUs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for All Branches",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Format Rate Limit Error": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Production": {
+      "main": [
+        [
+          {
+            "node": "Add user to group",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Israel?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add user to group": {
+      "main": [
+        [
+          {
+            "node": "Israel?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Rate Limit from Upstash": {
+      "main": [
+        [
+          {
+            "node": "Check & Update Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Triggered by Email": {
+      "main": [
+        [
+          {
+            "node": "Reply to a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "timezone": "Asia/Jerusalem",
+    "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "versionId": "bb33a2f2-17a6-44c0-af22-093714714ea6",
+  "versionId": "92bd6918-b319-46dc-9346-71d01df415ad",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "d5e596dc4e14c9671997af6bf37a4ff1617791c0195f35bfbfc7868a23b27c77"
+    "instanceId": "11bedb7e89cd19b5c24ff1651de53a60104659bce78dbeb0a9a7bc0701eecc58"
   },
-  "id": "uOrARDQjJNyR22vV",
+  "id": "lUUtTTcdEMqMXtWG",
   "tags": []
 }

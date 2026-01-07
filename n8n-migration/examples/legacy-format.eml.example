@@ -1,0 +1,33 @@
+MIME-Version: 1.0
+Date: Mon, 01 Jan 2024 10:00:00 +0000
+Message-ID: <example4@mail.example.com>
+Subject: New Hire Onboarding: Emily Johnson - Designer - United States
+From: HR Department <hr@company.com>
+To: IT Automation <it-automation@company.com>
+Content-Type: multipart/alternative; boundary="000000000000example4"
+
+--000000000000example4
+Content-Type: text/plain; charset="UTF-8"
+
+Hi team,
+
+Please begin onboarding for our new hire:
+
+Full Legal Name: Emily Rose Johnson
+Preferred Name: Em
+Personal Email Address: emily.j@personal-email.com
+Manager: Michael Brown
+Position: UX Designer
+Department: Design
+Employee ID: EMP004
+Start Date: 01/15/2024
+Phone Number: +1-555-0400
+
+Thanks!
+
+--000000000000example4
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">Hi team,<br><br>Please begin onboarding for our new hire:<br><br>Full Legal Name: Emily Rose Johnson<br>Preferred Name: Em<br>Personal Email Address: <a href="mailto:emily.j@personal-email.com">emily.j@personal-email.com</a><br>Manager: Michael Brown<br>Position: UX Designer<br>Department: Design<br>Employee ID: EMP004<br>Start Date: 01/15/2024<br>Phone Number: +1-555-0400<br><br>Thanks!</div>
+
+--000000000000example4--

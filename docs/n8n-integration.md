@@ -271,13 +271,18 @@ The workflow includes a sophisticated parser that handles:
 
 **Parsing Logic:**
 1. Extract fields from email body (handles HTML table → plain text conversion)
+   - Removes markdown formatting (asterisks: `**Name**` → `Name`)
+   - Fixes broken words from line breaks (`V ictoria` → `Victoria`)
+   - Collapses multiple spaces and normalizes whitespace
 2. Parse full name with smart compound surname detection:
    - 2 words: "Ben Shalev" → First: "Ben", Last: "Shalev"
    - 3+ words with patronymic: "Ofek Ben Shabat" → First: "Ofek", Last: "Ben Shabat"
    - 3+ words with particles: "Juan de la Cruz" → First: "Juan", Last: "de la Cruz"
    - Default: Last 2 words as surname for Spanish/Portuguese names
 3. Use preferred name for email if provided
-4. Generate email: `firstname@domain.com` (normalized, accents removed)
+   - If preferred name has multiple words, uses only the first word for email
+   - Example: "Victoria Briones Zenteno" → email: `victoria@domain.com` (not `victoriabriones@domain.com`)
+4. Generate email: `firstname@domain.com` (normalized, accents removed, using first word only)
 
 ### Gmail Trigger Setup
 

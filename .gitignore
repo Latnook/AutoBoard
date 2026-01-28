@@ -60,3 +60,5 @@ n8n-migration/*.eml
 n8n-cloud-setup.md
 n8n-email-integration.md
 n8n-redis-rate-limiting.md
+
+AGENTS.MD
